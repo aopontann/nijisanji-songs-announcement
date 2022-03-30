@@ -1,30 +1,25 @@
-# syntax=docker/dockerfile:1
-
-FROM golang:1.17-alpine
-
+FROM golang:1.17-alpine AS dev
 WORKDIR /workspaces/nijisanji-songs-announcement
-
-# COPY go.mod ./
-# COPY go.sum ./
-
-# RUN go mod download
-
-# DBマイグレーションツールのインストール
-RUN go install github.com/pressly/goose/v3/cmd/goose@latest
-
-# Golang ホットリロードするためインストールする
+COPY go.mod go.sum ./
+RUN go mod download
 RUN go get -u github.com/cosmtrek/air
-
-# gitをインストール(vscodeの拡張機能「remote - Containers」を使って開発する場合)
 RUN apk add git
-
-# Goの拡張機能のインストール
 RUN go install -v golang.org/x/tools/gopls@latest
 RUN go install -v github.com/ramya-rao-a/go-outline@latest
-
 COPY . ./
+EXPOSE 8081
 
-# ホットリロード機能が付いた開発環境を起動
-# CMD [ "air -c .air.toml" ]
+# http://docs.docker.jp/v19.03/develop/develop-images/multistage-build.htmlのコピー
+FROM golang:1.17-alpine AS builder
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . ./
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
 
-EXPOSE 8000
+FROM alpine:latest
+# コンテナでSSL接続するためインストール
+RUN apk --no-cache add ca-certificates
+WORKDIR /root/
+COPY --from=builder /app .
+CMD ["./app"]
