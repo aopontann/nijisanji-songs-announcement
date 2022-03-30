@@ -10,16 +10,16 @@ COPY . ./
 EXPOSE 8081
 
 # http://docs.docker.jp/v19.03/develop/develop-images/multistage-build.htmlのコピー
-FROM golang:1.17-alpine AS builder
+FROM golang:1.17-alpine AS build
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . ./
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
 
-FROM alpine:latest
+FROM alpine:latest AS prod
 # コンテナでSSL接続するためインストール
 RUN apk --no-cache add ca-certificates
 WORKDIR /root/
-COPY --from=builder /app .
+COPY --from=build /app .
 CMD ["./app"]
