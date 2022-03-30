@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"google.golang.org/api/option"
 	"google.golang.org/api/youtube/v3"
@@ -20,11 +21,13 @@ func YoutubeHandler(w http.ResponseWriter, _ *http.Request) {
 		log.Fatalf("Error creating YouTube client: %v", err)
 	}
 	// 動画検索
+	dtAfter := time.Now().Add(-1 * time.Hour).Format("2006-01-02T15:00:00Z")
+	dtBefore := time.Now().Format("2006-01-02T15:04:05Z")
 	searchCall := youtubeService.Search.List([]string{"id"}).
 		MaxResults(50).
 		Q("にじさんじ + 歌って|cover|歌").
-		PublishedAfter("2022-03-28T00:00:00Z").
-		PublishedBefore("2022-03-28T23:59:59Z")
+		PublishedAfter(dtAfter).
+		PublishedBefore(dtBefore)
 	searchRes, err := searchCall.Do()
 	if err != nil {
 		log.Fatalf("Error making API call to list channels: %v\n", err.Error())
