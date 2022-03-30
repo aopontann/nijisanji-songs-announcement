@@ -1,1 +1,2 @@
 # nijisanji-songs-announcement
+あいうえお
