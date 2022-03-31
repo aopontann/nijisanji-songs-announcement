@@ -10,10 +10,17 @@ import (
 )
 
 func main() {
+	log.Print("starting server...")
 	// .envの読み込み
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
+	}
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+		log.Printf("defaulting to port %s", port)
 	}
 
 	// DB接続初期化
@@ -28,9 +35,9 @@ func main() {
 	// http.HandleFunc("/seed", Seed) // Seed
 	// http.HandleFunc("/seedOut", SeedOut) // Seed
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	// Start HTTP server.
+	log.Printf("listening on port %s", port)
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
+		log.Fatal(err)
 	}
-	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
