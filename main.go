@@ -11,10 +11,10 @@ import (
 
 func main() {
 	log.Print("starting server...")
-	// .envの読み込み
+	// .envの読み込み(開発環境の時のみ読み込むようにしたい)
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Printf("Error loading .env file")
 	}
 
 	port := os.Getenv("PORT")
