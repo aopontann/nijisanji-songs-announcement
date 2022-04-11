@@ -32,11 +32,12 @@ func main() {
 
 	http.HandleFunc("/", h1)
 	http.HandleFunc("/youtube", YoutubeHandler)
+	http.HandleFunc("/twitter", TwitterHandler)
 	// http.HandleFunc("/seed", Seed) // Seed
 	// http.HandleFunc("/seedOut", SeedOut) // Seed
 
-	// Start HTTP server.
 	log.Printf("listening on port %s", port)
+	// Start HTTP server.
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatal(err)
 	}
