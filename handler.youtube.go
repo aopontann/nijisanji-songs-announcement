@@ -14,6 +14,11 @@ import (
 	"google.golang.org/api/youtube/v3"
 )
 
+type getVideoInfo struct {
+	Id    string `json:"id"`
+	Title string `json:"title"`
+}
+
 func YoutubeHandler(w http.ResponseWriter, _ *http.Request) {
 	ctx := context.Background()
 	youtubeService, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
@@ -43,7 +48,7 @@ func YoutubeHandler(w http.ResponseWriter, _ *http.Request) {
 	}
 	fmt.Printf("videoId=%s\n", videoId)
 
-	// にじさんじのライバーのチャンネルリストを取得する
+	// にじさんじのライバーのチャンネルリスト
 	var (
 		channelId     string
 		channelIdList []string
@@ -97,9 +102,14 @@ func YoutubeHandler(w http.ResponseWriter, _ *http.Request) {
 			continue
 		}
 		// 動画タイトルに特定の文字が含まれているか
-		checkRes := TitleCheck(video.Snippet.Title)
+		checkRes := titleCheck(video.Snippet.Title)
 		// にじさんじライバーのチャンネルで公開されたか
-		if !NijisanjiCheck(channelIdList, video.Snippet.ChannelId) {
+		if !nijisanjiCheck(channelIdList, video.Snippet.ChannelId) {
+			// にじさんじライバーのチャンネルでもなく、特定の文字が含まれていない場合
+			if !checkRes {
+				continue
+			}
+			// にじさんじライバーのチャンネルではないが、特定の文字が含まれている場合（外部コラボの可能性がある）
 			checkRes = false
 		}
 		// DBに動画情報を保存
@@ -110,4 +120,68 @@ func YoutubeHandler(w http.ResponseWriter, _ *http.Request) {
 		// テストログ
 		fmt.Printf("id=%s  title=%s duration=%s schedule=%s\n", video.Id, video.Snippet.Title, video.ContentDetails.Duration, scheduledStartTime)
 	}
+}
+
+// タイトルにこの文字が含まれていると歌動画確定
+var definiteList = []string{
+	"歌ってみた",
+	"歌わせていただきました",
+	"歌って踊ってみた",
+	"cover",
+	"Cover",
+	"COVER",
+	"MV",
+	"Music Video",
+	// "ソング",
+	// "song",
+	"オリジナル曲",
+	"オリジナルMV",
+	"Official Lyric Video",
+}
+
+// タイトルに特定の文字が含まれているかチェックする
+func titleCheck(title string) bool {
+	for _, cstr := range definiteList {
+		reg := fmt.Sprintf(`.*%s.*`, cstr)
+		if regexp.MustCompile(reg).Match([]byte(title)) {
+			return true
+		}
+	}
+	return false
+}
+
+// にじさんじライバーのチャンネルから投稿された動画かチェックする
+func nijisanjiCheck(channelIdList []string, id string) bool {
+	for _, channelId := range channelIdList {
+		if id == channelId {
+			return true
+		}
+	}
+	return false
+}
+
+// 時間を指定して動画を取得する
+func getVideos(at string, bt string) ([]getVideoInfo, error) {
+	var (
+		id        string
+		title     string
+		videoList []getVideoInfo
+	)
+	rows, err := DB.Query("SELECT id, title FROM videos WHERE songConfirm = 1 AND scheduled_start_time >= ? AND scheduled_start_time <= ?", at, bt)
+	if err != nil {
+		return []getVideoInfo{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		err := rows.Scan(&id, &title)
+		if err != nil {
+			return []getVideoInfo{}, err
+		}
+		videoList = append(videoList, getVideoInfo{Id: id, Title: title})
+	}
+	err = rows.Err()
+	if err != nil {
+		return []getVideoInfo{}, err
+	}
+	return videoList, nil
 }
