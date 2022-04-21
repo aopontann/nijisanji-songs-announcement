@@ -55,6 +55,7 @@ func TwitterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, video := range videoList {
+		log.Printf("tweet title = %s\n", video.Title)
 		err := PostTweet(video.Id, video.Title)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
