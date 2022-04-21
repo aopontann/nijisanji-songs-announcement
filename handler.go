@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 )
@@ -43,6 +44,8 @@ func TwitterHandler(w http.ResponseWriter, r *http.Request) {
     }
 	dtAfter := time.Now().UTC().Format("2006-01-02 15:04:00")
 	dtBefore := time.Now().UTC().Add(5 * time.Minute).Format("2006-01-02 15:04:00")
+
+	log.Printf("twitter-get-youtube-video: %s ~ %s\n", dtAfter, dtBefore)
 
 	videoList, err := GetVideos(dtAfter, dtBefore)
 	if err != nil {
