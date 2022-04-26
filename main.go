@@ -33,6 +33,8 @@ func main() {
 	http.HandleFunc("/", h1)
 	http.HandleFunc("/youtube", YoutubeHandler)
 	http.HandleFunc("/twitter", TwitterHandler)
+	http.HandleFunc("/youtube/sections", YoutubeChannelSectionsHandler)
+
 	// http.HandleFunc("/seed", Seed) // Seed
 	// http.HandleFunc("/seedOut", SeedOut) // Seed
 
