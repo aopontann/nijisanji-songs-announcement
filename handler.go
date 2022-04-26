@@ -65,3 +65,23 @@ func TwitterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Write([]byte("Twitter OK"))
 }
+
+func YoutubeChannelSectionsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+        w.WriteHeader(http.StatusMethodNotAllowed) // 405
+        w.Write([]byte("POSTだけだよ"))
+        return
+    }
+
+	ctx := context.Background()
+	uploadList, err := CheckUploadVideos(ctx)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	for _, list := range uploadList {
+		log.Printf("youtube-channel-sections: channelId = %s\n", list.channelId)
+	}
+	w.Write([]byte("Youtube Channel Sections OK"))
+}
