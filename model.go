@@ -35,6 +35,11 @@ type videoListResponse struct {
 	scheduledStartTime string
 }
 
+type channelSectionsResponse struct {
+	Id        string
+	channelId string
+}
+
 type RequestBody struct {
 	Text string `json:"text"`
 }
@@ -300,4 +305,31 @@ func PostTweet(id string, text string) error {
 
 	fmt.Printf("%#v", string(byteArray))
 	return nil
+}
+
+// チャンネルから動画がアップロードされたかチェック
+func CheckUploadVideos(ctx context.Context) ([]channelSectionsResponse, error) {
+	var uploadChannelList []channelSectionsResponse
+	youtubeService, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
+	if err != nil {
+		return uploadChannelList, err
+	}
+	channelIdList, err := GetChannelIdList()
+	if err != nil {
+		return uploadChannelList, err
+	}
+	for _, channelId := range channelIdList {
+		call := youtubeService.ChannelSections.List([]string{"snippet"}).ChannelId(channelId)
+		res, err := call.Do()
+		if err != nil {
+			return uploadChannelList, err
+		}
+		for _, item := range res.Items {
+			if item.Snippet.Type != "upcomingevents" {
+				continue
+			}
+			uploadChannelList = append(uploadChannelList, channelSectionsResponse{item.Id, item.Snippet.ChannelId})
+		}
+	}
+	return uploadChannelList, nil
 }
