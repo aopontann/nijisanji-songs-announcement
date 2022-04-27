@@ -6,6 +6,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha1"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -33,11 +34,6 @@ type videoListResponse struct {
 	Title              string
 	checkRes           bool
 	scheduledStartTime string
-}
-
-type channelSectionsResponse struct {
-	Id        string
-	channelId string
 }
 
 type RequestBody struct {
@@ -308,28 +304,45 @@ func PostTweet(id string, text string) error {
 }
 
 // チャンネルから動画がアップロードされたかチェック
-func CheckUploadVideos(ctx context.Context) ([]channelSectionsResponse, error) {
-	var uploadChannelList []channelSectionsResponse
+func CheckUploadVideos(ctx context.Context) error {
+	var id string
 	youtubeService, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
 	if err != nil {
-		return uploadChannelList, err
+		return err
 	}
+
 	channelIdList, err := GetChannelIdList()
 	if err != nil {
-		return uploadChannelList, err
+		return err
 	}
+
+	stmt, err := DB.PrepareContext(ctx, "INSERT IGNORE INTO sections (id, vtuber_id) VALUES(?,?)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
 	for _, channelId := range channelIdList {
 		call := youtubeService.ChannelSections.List([]string{"snippet"}).ChannelId(channelId)
 		res, err := call.Do()
 		if err != nil {
-			return uploadChannelList, err
+			return err
 		}
 		for _, item := range res.Items {
 			if item.Snippet.Type != "upcomingevents" {
 				continue
 			}
-			uploadChannelList = append(uploadChannelList, channelSectionsResponse{item.Id, item.Snippet.ChannelId})
+			err := DB.QueryRow("SELECT id FROM sections WHERE id = ?", item.Id).Scan(&id)
+			if err == sql.ErrNoRows {
+				log.Printf("youtube-channel-sections: channelId = %s\n", item.Snippet.ChannelId)
+				_, err = stmt.Exec(item.Id, item.Snippet.ChannelId)
+				if err != nil {
+					return err
+				}
+			} else if err != nil {
+				return err
+			}
 		}
 	}
-	return uploadChannelList, nil
+	return nil
 }
