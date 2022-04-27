@@ -74,14 +74,11 @@ func YoutubeChannelSectionsHandler(w http.ResponseWriter, r *http.Request) {
     }
 
 	ctx := context.Background()
-	uploadList, err := CheckUploadVideos(ctx)
+	err := CheckUploadVideos(ctx)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
-	}
-	for _, list := range uploadList {
-		log.Printf("youtube-channel-sections: channelId = %s\n", list.channelId)
 	}
 	w.Write([]byte("Youtube Channel Sections OK"))
 }
