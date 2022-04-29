@@ -47,8 +47,11 @@ func YoutubeSearchList(ctx context.Context) (string, error) {
 		return "", err
 	}
 	// 動画検索
-	dtAfter := time.Now().Add(-1 * time.Hour).Format("2006-01-02T15:00:00Z")
-	dtBefore := time.Now().Format("2006-01-02T15:04:05Z")
+	dtAfter := time.Now().Add(-1 * time.Hour).UTC().Format("2006-01-02T15:00:00Z")
+	dtBefore := time.Now().UTC().Format("2006-01-02T15:04:05Z")
+
+	log.Printf("youtube-search-list: %s ~ %s\n", dtAfter, dtBefore)
+
 	searchCall := youtubeService.Search.List([]string{"id"}).
 		MaxResults(50).
 		Q("にじさんじ + 歌って|cover|歌").
