@@ -40,14 +40,14 @@ type RequestBody struct {
 	Text string `json:"text"`
 }
 
-// 過去1時間までにYouTubeにアップロードされた動画を取得する
+// 過去30分間までにYouTubeにアップロードされた動画を取得する
 func YoutubeSearchList(ctx context.Context) (string, error) {
 	youtubeService, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
 	if err != nil {
 		return "", err
 	}
 	// 動画検索
-	dtAfter := time.Now().Add(-1 * time.Hour).UTC().Format("2006-01-02T15:00:00Z")
+	dtAfter := time.Now().Add(-30 * time.Minute).UTC().Format("2006-01-02T15:00:00Z")
 	dtBefore := time.Now().UTC().Format("2006-01-02T15:04:05Z")
 
 	log.Printf("youtube-search-list: %s ~ %s\n", dtAfter, dtBefore)
