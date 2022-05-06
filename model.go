@@ -54,7 +54,7 @@ func YoutubeSearchList(ctx context.Context) (string, error) {
 
 	searchCall := youtubeService.Search.List([]string{"id"}).
 		MaxResults(50).
-		Q("にじさんじ + 歌って|cover|歌").
+		Q("にじさんじ 歌").
 		PublishedAfter(dtAfter).
 		PublishedBefore(dtBefore)
 	searchRes, err := searchCall.Do()
