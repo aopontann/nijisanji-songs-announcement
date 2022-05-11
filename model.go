@@ -6,7 +6,6 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha1"
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -29,32 +28,25 @@ type getVideoInfo struct {
 	Title string `json:"title"`
 }
 
-type videoListResponse struct {
-	Id                 string
-	Title              string
-	checkRes           bool
-	scheduledStartTime string
-}
-
 type RequestBody struct {
 	Text string `json:"text"`
 }
 
 // 過去30分間までにYouTubeにアップロードされた動画を取得する
-func YoutubeSearchList(ctx context.Context) (string, error) {
+func YoutubeSearchList(ctx context.Context, q string) (string, error) {
 	youtubeService, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
 	if err != nil {
 		return "", err
 	}
 	// 動画検索
-	dtAfter := time.Now().Add(-30 * time.Minute).UTC().Format("2006-01-02T15:00:00Z")
-	dtBefore := time.Now().UTC().Format("2006-01-02T15:04:05Z")
+	dtAfter := time.Now().UTC().Add(-30 * time.Minute).Format("2006-01-02T15:04:00Z")
+	dtBefore := time.Now().UTC().Format("2006-01-02T15:04:00Z")
 
 	log.Printf("youtube-search-list: %s ~ %s\n", dtAfter, dtBefore)
 
 	searchCall := youtubeService.Search.List([]string{"id"}).
 		MaxResults(50).
-		Q("にじさんじ 歌").
+		Q(q).
 		PublishedAfter(dtAfter).
 		PublishedBefore(dtBefore)
 	searchRes, err := searchCall.Do()
@@ -78,7 +70,7 @@ func YoutubeVideoList(ctx context.Context, videoIdList string) error {
 
 	// Youtube Data API から動画情報を取得する
 	youtubeService, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
-	videoscall := youtubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(videoIdList)
+	videoscall := youtubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(videoIdList).MaxResults(50)
 	response, err := videoscall.Do()
 	if err != nil {
 		return err
@@ -303,49 +295,5 @@ func PostTweet(id string, text string) error {
 	}
 
 	fmt.Printf("%#v", string(byteArray))
-	return nil
-}
-
-// チャンネルから動画がアップロードされたかチェック
-func CheckUploadVideos(ctx context.Context) error {
-	var id string
-	youtubeService, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
-	if err != nil {
-		return err
-	}
-
-	channelIdList, err := GetChannelIdList()
-	if err != nil {
-		return err
-	}
-
-	stmt, err := DB.PrepareContext(ctx, "INSERT IGNORE INTO sections (id, vtuber_id) VALUES(?,?)")
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-
-	for _, channelId := range channelIdList {
-		call := youtubeService.ChannelSections.List([]string{"snippet"}).ChannelId(channelId)
-		res, err := call.Do()
-		if err != nil {
-			return err
-		}
-		for _, item := range res.Items {
-			if item.Snippet.Type != "upcomingevents" {
-				continue
-			}
-			err := DB.QueryRow("SELECT id FROM sections WHERE id = ?", item.Id).Scan(&id)
-			if err == sql.ErrNoRows {
-				log.Printf("youtube-channel-sections: channelId = %s\n", item.Snippet.ChannelId)
-				_, err = stmt.Exec(item.Id, item.Snippet.ChannelId)
-				if err != nil {
-					return err
-				}
-			} else if err != nil {
-				return err
-			}
-		}
-	}
 	return nil
 }
