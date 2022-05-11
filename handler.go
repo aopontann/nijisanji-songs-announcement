@@ -16,20 +16,24 @@ func YoutubeHandler(w http.ResponseWriter, r *http.Request) {
     }
 
 	ctx := context.Background()
-	videoId, err := YoutubeSearchList(ctx)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
 
-	fmt.Printf("videoId=%s\n", videoId)
+	for _, q := range []string{"にじさんじ 歌", "にじさんじ 歌ってみた"} {
+		videoId, err := YoutubeSearchList(ctx, q)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+			return
+		}
 
-	err = YoutubeVideoList(ctx, videoId)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
+		// 検索にヒットした動画IDをログに出力
+		fmt.Printf("videoId=%s\n", videoId)
+
+		err = YoutubeVideoList(ctx, videoId)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+			return
+		}
 	}
 	w.Write([]byte("Youtube OK"))
 }
@@ -64,21 +68,4 @@ func TwitterHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.Write([]byte("Twitter OK"))
-}
-
-func YoutubeChannelSectionsHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-        w.WriteHeader(http.StatusMethodNotAllowed) // 405
-        w.Write([]byte("POSTだけだよ"))
-        return
-    }
-
-	ctx := context.Background()
-	err := CheckUploadVideos(ctx)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
-	w.Write([]byte("Youtube Channel Sections OK"))
 }
