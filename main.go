@@ -27,16 +27,12 @@ func main() {
 	DBInit()
 
 	h1 := func(w http.ResponseWriter, _ *http.Request) {
-		io.WriteString(w, "Hello from a HandleFunc #1!!!\n")
+		io.WriteString(w, "pong\n")
 	}
 
-	http.HandleFunc("/", h1)
+	http.HandleFunc("/ping", h1)
 	http.HandleFunc("/youtube", YoutubeHandler)
 	http.HandleFunc("/twitter", TwitterHandler)
-	http.HandleFunc("/youtube/sections", YoutubeChannelSectionsHandler)
-
-	// http.HandleFunc("/seed", Seed) // Seed
-	// http.HandleFunc("/seedOut", SeedOut) // Seed
 
 	log.Printf("listening on port %s", port)
 	// Start HTTP server.
