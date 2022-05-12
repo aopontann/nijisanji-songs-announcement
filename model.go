@@ -42,17 +42,18 @@ func YoutubeSearchList(ctx context.Context, q string) (string, error) {
 	dtAfter := time.Now().UTC().Add(-30 * time.Minute).Format("2006-01-02T15:04:00Z")
 	dtBefore := time.Now().UTC().Format("2006-01-02T15:04:00Z")
 
-	log.Printf("youtube-search-list: %s ~ %s\n", dtAfter, dtBefore)
-
 	searchCall := youtubeService.Search.List([]string{"id"}).
-		MaxResults(50).
-		Q(q).
-		PublishedAfter(dtAfter).
-		PublishedBefore(dtBefore)
+	MaxResults(50).
+	Q(q).
+	PublishedAfter(dtAfter).
+	PublishedBefore(dtBefore)
 	searchRes, err := searchCall.Do()
 	if err != nil {
 		return "", err
 	}
+
+	log.Printf("youtube-search-list: %s ~ %s item: %d\n", dtAfter, dtBefore,searchRes.PageInfo.ResultsPerPage)
+
 	// これもっといいロジックがある https://qiita.com/ono_matope/items/d5e70d8a9ff2b54d5c37
 	videoId := ""
 	for _, searchItem := range searchRes.Items {
