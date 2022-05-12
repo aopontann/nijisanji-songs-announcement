@@ -17,7 +17,7 @@ func YoutubeHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctx := context.Background()
 
-	for _, q := range []string{"にじさんじ 歌", "にじさんじ 歌ってみた"} {
+	for _, q := range []string{"にじさんじ", "NIJISANJI"} {
 		videoId, err := YoutubeSearchList(ctx, q)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
