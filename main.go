@@ -1,13 +1,18 @@
 package main
 
 import (
+	"context"
 	"io"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/joho/godotenv"
+	"google.golang.org/api/option"
+	"google.golang.org/api/youtube/v3"
 )
+
+var YoutubeService *youtube.Service
 
 func main() {
 	log.Print("starting server...")
@@ -21,6 +26,12 @@ func main() {
 	if port == "" {
 		port = "8080"
 		log.Printf("defaulting to port %s", port)
+	}
+
+	ctx := context.Background()
+	YoutubeService, err = youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
+	if err != nil {
+		log.Printf("Error youtube.NewService")
 	}
 
 	// DB接続初期化

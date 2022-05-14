@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha1"
@@ -18,9 +17,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"google.golang.org/api/option"
-	"google.golang.org/api/youtube/v3"
 )
 
 type getVideoInfo struct {
@@ -33,50 +29,45 @@ type RequestBody struct {
 }
 
 // 過去30分間までにYouTubeにアップロードされた動画を取得する
-func YoutubeSearchList(ctx context.Context, q string) (string, error) {
-	youtubeService, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
-	if err != nil {
-		return "", err
-	}
-	// 動画検索
+func YoutubeSearchList() ([]string, error) {
+	// 動画検索範囲
 	dtAfter := time.Now().UTC().Add(-30 * time.Minute).Format("2006-01-02T15:04:00Z")
 	dtBefore := time.Now().UTC().Format("2006-01-02T15:04:00Z")
 
-	searchCall := youtubeService.Search.List([]string{"id"}).
-	MaxResults(50).
-	Q(q).
-	PublishedAfter(dtAfter).
-	PublishedBefore(dtBefore)
-	searchRes, err := searchCall.Do()
-	if err != nil {
-		return "", err
-	}
+	log.Printf("youtube-search-list-published: %s ~ %s\n", dtAfter, dtBefore)
 
-	log.Printf("youtube-search-list: %s ~ %s item: %d\n", dtAfter, dtBefore,searchRes.PageInfo.ResultsPerPage)
+	// 動画ID
+	vid := make([]string, 0, 600)
 
-	// これもっといいロジックがある https://qiita.com/ono_matope/items/d5e70d8a9ff2b54d5c37
-	videoId := ""
-	for _, searchItem := range searchRes.Items {
-		if videoId == "" {
-			videoId = searchItem.Id.VideoId
-			continue
+	for _, q := range []string{"にじさんじ", "NIJISANJI"} {
+		log.Printf("youtube-search-list-q: %s\n", q)
+		pt := ""
+		for {
+			// youtube data api search list にリクエストを送る
+			call := YoutubeService.Search.List([]string{"id"}).MaxResults(50).Q(q).PublishedAfter(dtAfter).PublishedBefore(dtBefore).PageToken(pt)
+			res, err := call.Do()
+			if err != nil {
+				return []string{}, err
+			}
+
+			for _, item := range res.Items {
+				vid = append(vid, item.Id.VideoId)
+			}
+
+			log.Printf("youtube-search-list-pageInfo: perPage=%d total=%d nextPage=%s\n", res.PageInfo.ResultsPerPage, res.PageInfo.TotalResults, res.NextPageToken)
+
+			if res.NextPageToken == "" {
+				break
+			}
+			pt = res.NextPageToken
 		}
-		videoId = videoId + "," + searchItem.Id.VideoId
 	}
-	return videoId, nil
+
+	return vid, nil
 }
 
 // Youtube Data API から動画情報を取得し、歌動画か判別してDBに動画情報を保存する
-func YoutubeVideoList(ctx context.Context, videoIdList string) error {
-
-	// Youtube Data API から動画情報を取得する
-	youtubeService, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
-	videoscall := youtubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(videoIdList).MaxResults(50)
-	response, err := videoscall.Do()
-	if err != nil {
-		return err
-	}
-
+func YoutubeVideoList(vid []string) error {
 	// にじさんじライバーのチャンネルリストを取得する
 	channelIdList, err := GetChannelIdList()
 	if err != nil {
@@ -89,44 +80,54 @@ func YoutubeVideoList(ctx context.Context, videoIdList string) error {
 		return err
 	}
 
-	// 歌動画か判断する
-	for _, video := range response.Items {
-		// プレミア公開する動画か
-		scheduledStartTime := "" // 例 2022-03-28T11:00:00Z
-		if video.LiveStreamingDetails != nil {
-			// "2022-03-28 11:00:00"形式に変換
-			rep1 := strings.Replace(video.LiveStreamingDetails.ScheduledStartTime, "T", " ", 1)
-			scheduledStartTime = strings.Replace(rep1, "Z", "", 1)
-		} else {
-			continue
-		}
-		// 動画の長さが9分59秒以下ではない場合
-		if !regexp.MustCompile(`^PT([1-9]M[1-5]?[0-9]S|[1-5]?[0-9]S)`).Match([]byte(video.ContentDetails.Duration)) {
-			continue
-		}
-		// 切り抜き動画である場合
-		if regexp.MustCompile(`.*切り抜き.*`).Match([]byte(video.Snippet.Title)) {
-			continue
-		}
-		// 動画タイトルに特定の文字が含まれているか
-		checkRes := TitleCheck(video.Snippet.Title)
-		// にじさんじライバーのチャンネルで公開されたか
-		if !NijisanjiCheck(channelIdList, video.Snippet.ChannelId) {
-			// にじさんじライバーのチャンネルでもなく、特定の文字が含まれていない場合
-			if !checkRes {
-				continue
-			}
-			// にじさんじライバーのチャンネルではないが、特定の文字が含まれている場合（外部コラボの可能性がある）
-			checkRes = false
-		}
-		// DBに動画情報を保存
-		_, err := stmt.Exec(video.Id, video.Snippet.Title, checkRes, scheduledStartTime)
+	for i := 0; i*50 < len(vid); i++ {
+		id := strings.Join(vid[50*i:50*(i+1)], ",")
+		call := YoutubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(id).MaxResults(50)
+		res, err := call.Do()
 		if err != nil {
 			return err
 		}
-		// テストログ
-		log.Printf("id=%s  title=%s duration=%s schedule=%s\n", video.Id, video.Snippet.Title, video.ContentDetails.Duration, scheduledStartTime)
+
+		// 歌動画か判断する
+		for _, video := range res.Items {
+			// プレミア公開する動画か
+			scheduledStartTime := "" // 例 2022-03-28T11:00:00Z
+			if video.LiveStreamingDetails != nil {
+				// "2022-03-28 11:00:00"形式に変換
+				rep1 := strings.Replace(video.LiveStreamingDetails.ScheduledStartTime, "T", " ", 1)
+				scheduledStartTime = strings.Replace(rep1, "Z", "", 1)
+			} else {
+				continue
+			}
+			// 動画の長さが9分59秒以下ではない場合
+			if !regexp.MustCompile(`^PT([1-9]M[1-5]?[0-9]S|[1-5]?[0-9]S)`).Match([]byte(video.ContentDetails.Duration)) {
+				continue
+			}
+			// 切り抜き動画である場合
+			if regexp.MustCompile(`.*切り抜き.*`).Match([]byte(video.Snippet.Title)) {
+				continue
+			}
+			// 動画タイトルに特定の文字が含まれているか
+			checkRes := TitleCheck(video.Snippet.Title)
+			// にじさんじライバーのチャンネルで公開されたか
+			if !NijisanjiCheck(channelIdList, video.Snippet.ChannelId) {
+				// にじさんじライバーのチャンネルでもなく、特定の文字が含まれていない場合
+				if !checkRes {
+					continue
+				}
+				// にじさんじライバーのチャンネルではないが、特定の文字が含まれている場合（外部コラボの可能性がある）
+				checkRes = false
+			}
+			// DBに動画情報を保存
+			_, err := stmt.Exec(video.Id, video.Snippet.Title, checkRes, scheduledStartTime)
+			if err != nil {
+				return err
+			}
+
+			log.Printf("youtube-video-list: id=%s title=%s duration=%s schedule=%s\n", video.Id, video.Snippet.Title, video.ContentDetails.Duration, scheduledStartTime)
+		}
 	}
+
 	return nil
 }
 
