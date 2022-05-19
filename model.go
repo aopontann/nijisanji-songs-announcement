@@ -53,7 +53,7 @@ func YoutubeSearchList() ([]string, error) {
 				vid = append(vid, item.Id.VideoId)
 			}
 
-			log.Info().Str("service", "youtube-search-list").Str("published", fmt.Sprintf("%s ~ %s", dtAfter, dtBefore)).Str("q", q).Str("pageInfo", fmt.Sprintf("perPage=%d total=%d nextPage=%s\n", res.PageInfo.ResultsPerPage, res.PageInfo.TotalResults, res.NextPageToken))
+			log.Info().Str("service", "youtube-search-list").Str("published", fmt.Sprintf("%s ~ %s", dtAfter, dtBefore)).Str("q", q).Str("pageInfo", fmt.Sprintf("perPage=%d total=%d nextPage=%s\n", res.PageInfo.ResultsPerPage, res.PageInfo.TotalResults, res.NextPageToken)).Strs("id", vid)
 
 			if res.NextPageToken == "" {
 				break
