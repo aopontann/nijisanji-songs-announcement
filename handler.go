@@ -1,9 +1,11 @@
 package main
 
 import (
-	"log"
+	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 func YoutubeHandler(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +43,7 @@ func TwitterHandler(w http.ResponseWriter, r *http.Request) {
 	dtAfter := time.Now().UTC().Format("2006-01-02 15:04:05")
 	dtBefore := time.Now().UTC().Add(5 * time.Minute).Format("2006-01-02 15:04:00")
 
-	log.Printf("twitter-get-youtube-video: %s ~ %s\n", dtAfter, dtBefore)
+	log.Info().Str("service", "tweet").Str("datetime", fmt.Sprintf("%s ~ %s\n", dtAfter, dtBefore))
 
 	videoList, err := GetVideos(dtAfter, dtBefore)
 	if err != nil {
@@ -51,7 +53,7 @@ func TwitterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, video := range videoList {
-		log.Printf("tweet title = %s\n", video.Title)
+		log.Info().Str("service", "tweet").Str("id", video.Id).Str("title", video.Title)
 		err := PostTweet(video.Id, video.Title)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)

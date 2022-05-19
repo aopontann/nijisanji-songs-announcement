@@ -4,6 +4,8 @@ go 1.17
 
 require google.golang.org/api v0.73.0
 
+require github.com/rs/zerolog v1.26.1 // indirect
+
 require (
 	cloud.google.com/go/compute v1.5.0 // indirect
 	github.com/go-sql-driver/mysql v1.6.0
