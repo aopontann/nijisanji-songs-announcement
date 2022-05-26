@@ -32,8 +32,8 @@ type RequestBody struct {
 // 過去30分間までにYouTubeにアップロードされた動画を取得する
 func YoutubeSearchList() ([]string, error) {
 	// 動画検索範囲
-	dtAfter := time.Now().UTC().Add(-30 * time.Minute).Format("2006-01-02T15:04:00Z")
-	dtBefore := time.Now().UTC().Format("2006-01-02T15:04:00Z")
+	dtAfter := time.Now().UTC().Add(-1 * time.Hour).Format("2006-01-02T15:04:00Z")
+	dtBefore := time.Now().UTC().Add(-30 * time.Minute).Format("2006-01-02T15:04:00Z")
 
 	// 動画ID
 	vid := make([]string, 0, 600)
