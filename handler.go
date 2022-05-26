@@ -40,7 +40,7 @@ func TwitterHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("POSTだけだよ"))
 		return
 	}
-	dtAfter := time.Now().UTC().Format("2006-01-02 15:04:05")
+	dtAfter := time.Now().UTC().Add(1 * time.Second).Format("2006-01-02 15:04:05")
 	dtBefore := time.Now().UTC().Add(5 * time.Minute).Format("2006-01-02 15:04:00")
 
 	log.Info().Str("service", "tweet").Str("datetime", fmt.Sprintf("%s ~ %s\n", dtAfter, dtBefore)).Send()
