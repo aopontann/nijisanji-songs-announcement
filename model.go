@@ -45,7 +45,7 @@ func YoutubeSearchList() ([]string, error) {
 			call := YoutubeService.Search.List([]string{"id"}).MaxResults(50).Q(q).PublishedAfter(dtAfter).PublishedBefore(dtBefore).PageToken(pt)
 			res, err := call.Do()
 			if err != nil {
-				log.Error().Err(err).Msg("search-list call error")
+				log.Error().Str("severity", "ERROR").Err(err).Msg("search-list call error")
 				return []string{}, err
 			}
 
@@ -54,6 +54,7 @@ func YoutubeSearchList() ([]string, error) {
 			}
 
 			log.Info().
+				Str("severity", "INFO").
 				Str("service", "youtube-search-list").
 				Str("published", fmt.Sprintf("%s ~ %s", dtAfter, dtBefore)).
 				Str("q", q).
@@ -76,14 +77,14 @@ func YoutubeVideoList(vid []string) error {
 	// にじさんじライバーのチャンネルリストを取得する
 	channelIdList, err := GetChannelIdList()
 	if err != nil {
-		log.Error().Err(err).Msg("GetChannelIdList error")
+		log.Error().Str("severity", "ERROR").Err(err).Msg("GetChannelIdList error")
 		return err
 	}
 
 	// DB準備
 	stmt, err := DB.Prepare("INSERT IGNORE INTO videos(id, title, songConfirm, scheduled_start_time) VALUES(?,?,?,?)")
 	if err != nil {
-		log.Error().Err(err).Msg("DB.Prepare error")
+		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Prepare error")
 		return err
 	}
 
@@ -92,7 +93,7 @@ func YoutubeVideoList(vid []string) error {
 		call := YoutubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(id).MaxResults(50)
 		res, err := call.Do()
 		if err != nil {
-			log.Error().Err(err).Msg("videos-list call error")
+			log.Error().Str("severity", "ERROR").Err(err).Msg("videos-list call error")
 			return err
 		}
 
@@ -129,11 +130,12 @@ func YoutubeVideoList(vid []string) error {
 			// DBに動画情報を保存
 			_, err := stmt.Exec(video.Id, video.Snippet.Title, checkRes, scheduledStartTime)
 			if err != nil {
-				log.Error().Err(err).Msg("Save videos failed")
+				log.Error().Str("severity", "ERROR").Err(err).Msg("Save videos failed")
 				return err
 			}
 
 			log.Info().
+				Str("severity", "INFO").
 				Str("service", "youtube-video-list").
 				Str("id", video.Id).
 				Str("title", video.Snippet.Title).
@@ -192,7 +194,7 @@ func GetChannelIdList() ([]string, error) {
 	)
 	rows, err := DB.Query("select id from vtubers")
 	if err != nil {
-		log.Error().Err(err).Msg("select vtuber failed")
+		log.Error().Str("severity", "ERROR").Err(err).Msg("select vtuber failed")
 		return channelIdList, err
 	}
 	defer rows.Close()
@@ -219,7 +221,7 @@ func GetVideos(at string, bt string) ([]getVideoInfo, error) {
 	)
 	rows, err := DB.Query("SELECT id, title FROM videos WHERE songConfirm = 1 AND scheduled_start_time >= ? AND scheduled_start_time <= ?", at, bt)
 	if err != nil {
-		log.Error().Err(err).Msg("select videos failed")
+		log.Error().Str("severity", "ERROR").Err(err).Msg("select videos failed")
 		return []getVideoInfo{}, err
 	}
 	defer rows.Close()
@@ -304,7 +306,7 @@ func PostTweet(id string, text string) error {
 	client := new(http.Client)
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Error().Err(err).Msg("twitter call failed")
+		log.Error().Str("severity", "ERROR").Err(err).Msg("twitter call failed")
 		return err
 	}
 	defer resp.Body.Close()
