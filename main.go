@@ -38,7 +38,13 @@ func main() {
 		io.WriteString(w, "pong\n")
 	}
 
+	h2 := func(w http.ResponseWriter, _ *http.Request) {
+		log.Info().Str("severity", "ERROR").Msg("error!!!")
+		io.WriteString(w, "error-demo\n")
+	}
+
 	http.HandleFunc("/ping", h1)
+	http.HandleFunc("/error", h2)
 	http.HandleFunc("/youtube", YoutubeHandler)
 	http.HandleFunc("/twitter", TwitterHandler)
 
