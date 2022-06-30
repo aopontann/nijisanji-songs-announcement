@@ -20,6 +20,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+type Tweet struct{}
+
 type getVideoInfo struct {
 	Id    string `json:"id"`
 	Title string `json:"title"`
@@ -256,7 +258,8 @@ func GenerateOAthNonce() (string, error) {
 }
 
 // 歌動画の告知ツイート
-func PostTweet(id string, text string) error {
+func (tw Tweet) Post(id string, text string) error {
+	const endpoint = "https://api.twitter.com/2/tweets"
 	text = fmt.Sprintf("5分後に公開予定\n\n%s\n\nhttps://www.youtube.com/watch?v=%s", text, id)
 	requestBody := &RequestBody{
 		Text: text,
@@ -317,5 +320,34 @@ func PostTweet(id string, text string) error {
 	}
 
 	fmt.Printf("%#v", string(byteArray))
+	return nil
+}
+
+// にじさんじライバーのツイートを取得する
+func (tw Tweet) Search() error {
+	url := "https://api.twitter.com/2/lists/1538799448679395328/tweets?expansions=author_id&user.fields=created_at&max_results=100"
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	token := fmt.Sprintf("Bearer %s", os.Getenv("TWITTER_BEARER_TOKEN"))
+	req.Header.Add("Authorization", token)
+
+	res, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	defer res.Body.Close()
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	fmt.Println(string(body))
 	return nil
 }
