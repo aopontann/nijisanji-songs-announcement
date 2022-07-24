@@ -4,7 +4,13 @@ go 1.17
 
 require google.golang.org/api v0.73.0
 
-require github.com/rs/zerolog v1.26.1 // indirect
+require (
+	cloud.google.com/go v0.100.2 // indirect
+	cloud.google.com/go/firestore v1.6.1 // indirect
+	github.com/google/go-cmp v0.5.7 // indirect
+	github.com/rs/zerolog v1.26.1 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+)
 
 require (
 	cloud.google.com/go/compute v1.5.0 // indirect
