@@ -51,6 +51,12 @@ type ListsResponse struct {
 	} `json:"meta"`
 }
 
+type TwitterSearchResponse struct {
+	ID        string `json:"id"`
+	YouTubeID string `json:"youtube_id"`
+	Text      string `json:"text"`
+}
+
 // 歌動画の告知ツイート
 func (tw *Twitter) Post(id string, text string) error {
 	const endpoint = "https://api.twitter.com/2/tweets"
@@ -162,13 +168,58 @@ func (tw *Twitter) Search() (*TwitterSearchRef, error) {
 }
 
 // ツイート内容に特定の文字列が含まれているかチェック
-func (tws *TwitterSearchRef) Select() {
-	// for _, v := range tws.data {
-	// 	fmt.Printf("-----------\n auther_id: %s\n id: %s\n text: %s\n-----------", v.AuthorID, v.ID, v.Text)
-	// }
-	for _, v := range tws.data {
-		if regexp.MustCompile(".*song|プレミア公開.*").Match([]byte(v.Text)) && !regexp.MustCompile(".*RT.*").Match([]byte(v.Text)) && regexp.MustCompile(".*youtu.be|youtube.com.*").Match([]byte(v.Text)){
-			fmt.Printf("-----------\n auther_id: %s\n id: %s\n text: %s\n-----------", v.AuthorID, v.ID, v.Text)
-		}
+func (tws *TwitterSearchRef) Select() ([]TwitterSearchResponse, error) {
+	var tsr []TwitterSearchResponse
+	clint := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
+	for _, v := range tws.data {
+		if !regexp.MustCompile(".*song|プレミア公開|MV.*").Match([]byte(v.Text)) {
+			continue
+		}
+		if regexp.MustCompile(".*RT.*").Match([]byte(v.Text)) {
+			continue
+		}
+		fmt.Printf("-----------\n id: %s\n text: %s ", v.ID, v.Text)
+		// ツイート内容に含まれるURLが短縮版のため、リダイレクト先のURLを取得する
+		idx := strings.Index(v.Text, "https://t.co/")
+		if idx == -1 {
+			continue
+		}
+		if len(v.Text) < idx+23 {
+			fmt.Printf(" WARNING \n-----------\n")
+			continue
+		}
+		sid := v.Text[idx : idx+23]
+		req, err := http.NewRequest("GET", sid, nil)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := clint.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		// Redirect先のURLを取得
+		rid := resp.Header.Get("Location")
+
+		// URLからYouTubeの動画ID部分を抽出する
+		var yid string
+		idx = strings.Index(rid, "youtu.be")
+		if idx != -1 {
+			yid = rid[17:28]
+		}
+		if idx == -1 {
+			idx = strings.Index(rid, "youtube.com")
+			if idx == -1 {
+				continue
+			}
+			yid = rid[32:43]
+		}
+
+		tsr = append(tsr, TwitterSearchResponse{ID: v.ID, YouTubeID: yid, Text: v.Text})
+		fmt.Printf("\n vid: %s\n yid: %s\n-----------\n", rid, yid)
+	}
+	return tsr, nil
 }
