@@ -8,7 +8,9 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var tweet = Tweet{}
+var tw = Twitter{}
+var yt = Youtube{}
+var fs = FireStore{}
 
 func YoutubeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -54,7 +56,7 @@ func TwitterHandler(w http.ResponseWriter, r *http.Request) {
 
 	for _, video := range videoList {
 		log.Info().Str("severity", "INFO").Str("service", "tweet").Str("id", video.Id).Str("title", video.Title).Send()
-		err := tweet.Post(video.Id, video.Title)
+		err := tw.Post(video.Id, video.Title)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
@@ -71,7 +73,25 @@ func TwitterSearchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := tweet.Search()
+	sr, err := tw.Search()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	ts, err := sr.Select()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	ytcr, err := yt.Check(ts)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	err = fs.Save(ytcr)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
