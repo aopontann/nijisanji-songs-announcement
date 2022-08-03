@@ -133,7 +133,7 @@ func (tw *Twitter) Post(id string, text string) error {
 
 // にじさんじライバーのツイートを取得する
 func (tw *Twitter) Search() (*TwitterSearchRef, error) {
-	endpoint := "https://api.twitter.com/2/lists/1538799448679395328/tweets?expansions=author_id&user.fields=created_at&max_results=30"
+	endpoint := "https://api.twitter.com/2/lists/1538799448679395328/tweets?expansions=author_id&user.fields=created_at&max_results=50"
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
@@ -176,20 +176,20 @@ func (tws *TwitterSearchRef) Select() ([]TwitterSearchResponse, error) {
 		},
 	}
 	for _, v := range tws.data {
+		clog := log.Info().Str("service", "twitter-select").Str("twitter_id", v.ID).Str("Text", v.Text)
 		if !regexp.MustCompile(".*song|プレミア公開|MV.*").Match([]byte(v.Text)) {
 			continue
 		}
 		if regexp.MustCompile(".*RT.*").Match([]byte(v.Text)) {
 			continue
 		}
-		fmt.Printf("-----------\n id: %s\n text: %s ", v.ID, v.Text)
 		// ツイート内容に含まれるURLが短縮版のため、リダイレクト先のURLを取得する
 		idx := strings.Index(v.Text, "https://t.co/")
 		if idx == -1 {
 			continue
 		}
 		if len(v.Text) < idx+23 {
-			fmt.Printf(" WARNING \n-----------\n")
+			clog.Str("severity", "WARNING").Send()
 			continue
 		}
 		sid := v.Text[idx : idx+23]
@@ -219,7 +219,7 @@ func (tws *TwitterSearchRef) Select() ([]TwitterSearchResponse, error) {
 		}
 
 		tsr = append(tsr, TwitterSearchResponse{ID: v.ID, YouTubeID: yid, Text: v.Text})
-		fmt.Printf("\n vid: %s\n yid: %s\n-----------\n", rid, yid)
+		clog.Str("severity", "INFO").Str("youtube_id", yid).Send()
 	}
 	return tsr, nil
 }
