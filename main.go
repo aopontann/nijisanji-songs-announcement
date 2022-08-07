@@ -47,6 +47,7 @@ func main() {
 	http.HandleFunc("/error", h2)
 	http.HandleFunc("/youtube", YoutubeHandler)
 	http.HandleFunc("/twitter", TwitterHandler)
+	http.HandleFunc("/twitter/search", TwitterSearchHandler)
 
 	// log.Debug().Msgf("listening on port %s", port)
 

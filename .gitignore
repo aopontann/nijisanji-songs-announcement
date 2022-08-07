@@ -1,3 +1,5 @@
 tmp
 .env
 .DS_STORE
+oryxBuildBinary
+token.json

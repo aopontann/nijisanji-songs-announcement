@@ -2,9 +2,10 @@ module github.com/aopontann/nijisanji-songs-announcement
 
 go 1.17
 
-require google.golang.org/api v0.73.0
-
-require github.com/rs/zerolog v1.26.1 // indirect
+require (
+	github.com/rs/zerolog v1.26.1
+	google.golang.org/api v0.73.0
+)
 
 require (
 	cloud.google.com/go/compute v1.5.0 // indirect
