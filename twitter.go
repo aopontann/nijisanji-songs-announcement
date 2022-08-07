@@ -21,9 +21,6 @@ import (
 )
 
 type Twitter struct{}
-type TwitterSearchRef struct {
-	data []GetTweetContext
-}
 
 type PostTweetContext struct {
 	Text string `json:"text"`

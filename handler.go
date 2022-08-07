@@ -10,7 +10,6 @@ import (
 
 var tw = Twitter{}
 var yt = Youtube{}
-var fs = FireStore{}
 
 func YoutubeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
