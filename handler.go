@@ -73,25 +73,21 @@ func TwitterSearchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sr, err := tw.Search()
+	tsr, err := tw.Search()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
-	ts, err := sr.Select()
+
+	ytcr, err := yt.Check(tsr)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
-	ytcr, err := yt.Check(ts)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
-	err = fs.Save(ytcr)
+
+	err = DBSave(ytcr)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
