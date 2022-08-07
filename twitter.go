@@ -132,7 +132,7 @@ func (tw *Twitter) Post(id string, text string) error {
 }
 
 // にじさんじライバーのツイートを取得する
-func (tw *Twitter) Search() (*TwitterSearchRef, error) {
+func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
 	endpoint := "https://api.twitter.com/2/lists/1538799448679395328/tweets?expansions=author_id&user.fields=created_at&max_results=50"
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", endpoint, nil)
@@ -162,24 +162,27 @@ func (tw *Twitter) Search() (*TwitterSearchRef, error) {
 		return nil, err
 	}
 
-	return &TwitterSearchRef{
-		data: gtc.Data,
-	}, nil
+	tsr, err := tweetSelect(gtc.Data)
+	if err != nil {
+		return nil, err
+	}
+
+	return tsr, nil
 }
 
-// ツイート内容に特定の文字列が含まれているかチェック
-func (tws *TwitterSearchRef) Select() ([]TwitterSearchResponse, error) {
+// ツイート内容に特定の文字列が含まれているかチェックしYouTubeIDを取得
+func tweetSelect(gtc []GetTweetContext) ([]TwitterSearchResponse, error) {
 	var tsr []TwitterSearchResponse
 	clint := &http.Client{
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}
-	for _, v := range tws.data {
+	for _, v := range gtc {
 		clog := log.Info().Str("service", "twitter-select").Str("twitter_id", v.ID).Str("Text", v.Text)
-		if !regexp.MustCompile(".*song|プレミア公開|MV.*").Match([]byte(v.Text)) {
-			continue
-		}
+		// if !regexp.MustCompile(".*song|プレミア公開|MV|cover.*").Match([]byte(v.Text)) {
+		// 	continue
+		// }
 		if regexp.MustCompile(".*RT.*").Match([]byte(v.Text)) {
 			continue
 		}
