@@ -31,14 +31,17 @@ func DBSave(ytcr []YouTubeCheckResponse) error {
 		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Begin error")
 		return err
 	}
-	stmt, err := tx.Prepare("INSERT IGNORE INTO videos(id, title, songConfirm, scheduled_start_time, twitter_id) VALUES(?,?,?,?,?)")
+	stmt, err := tx.Prepare("INSERT IGNORE INTO videos(id, title, songConfirm, scheduled_start_time, twitter_id) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE twitter_id = ?")
 	if err != nil {
 		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Prepare error")
 		return err
 	}
 
 	for _, v := range ytcr {
-		_, err := stmt.Exec(v.ID, v.Title, true, v.Schedule, v.TwitterID)
+		// v.TwitterID が二つある理由は
+		// 既にレコードが存在している場合INSERTをスキップするが、twitter_id を上書きしたい時があるため、
+		// VALUES とON DUPLICATE KEY UPDATE の二箇所で twitter_id を指定しているため
+		_, err := stmt.Exec(v.ID, v.Title, true, v.Schedule, v.TwitterID, v.TwitterID)
 		if err != nil {
 			log.Error().Str("severity", "ERROR").Err(err).Msg("Save videos failed")
 			tx.Rollback()
