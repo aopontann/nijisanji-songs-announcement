@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"database/sql"
 	"os"
 
@@ -26,17 +25,31 @@ func DBInit() {
 	}
 }
 
-func (fs *FireStore) Save(ytcr []YouTubeCheckResponse) error {
-	ctx := context.Background()
+func DBSave(ytcr []YouTubeCheckResponse) error {
+	tx, err := DB.Begin()
+	if err != nil {
+		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Begin error")
+		return err
+	}
+	stmt, err := tx.Prepare("INSERT IGNORE INTO videos(id, title, songConfirm, scheduled_start_time, twitter_id) VALUES(?,?,?,?,?)")
+	if err != nil {
+		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Prepare error")
+		return err
+	}
+
 	for _, v := range ytcr {
-		_, _, err := FireStoreService.Collection("demo").Add(ctx, map[string]interface{}{
-			"twitter_id":  v.TwitterID,
-			"schedule": v.Schedule,
-			"youtube_id":   v.ID,
-		})
+		_, err := stmt.Exec(v.ID, v.Title, true, v.Schedule, v.TwitterID)
 		if err != nil {
+			log.Error().Str("severity", "ERROR").Err(err).Msg("Save videos failed")
+			tx.Rollback()
 			return err
 		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Commit error")
+		return err
 	}
 	return nil
 }
