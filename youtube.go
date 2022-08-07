@@ -11,10 +11,12 @@ type Youtube struct{}
 
 type YouTubeCheckResponse struct {
 	ID        string `json:"id"`
+	Title     string `json:"title"`
 	Schedule  string `json:"schedule"`
 	TwitterID string `json:"twitter_id"`
 }
 
+// 動画IDから動画詳細情報を取得して歌動画か判断する
 func (yt *Youtube) Check(tsr []TwitterSearchResponse) ([]YouTubeCheckResponse, error) {
 	var ytcr []YouTubeCheckResponse
 	var id []string
@@ -55,7 +57,7 @@ func (yt *Youtube) Check(tsr []TwitterSearchResponse) ([]YouTubeCheckResponse, e
 			continue
 		}
 
-		ytcr = append(ytcr, YouTubeCheckResponse{ID: video.Id, Schedule: video.LiveStreamingDetails.ScheduledStartTime, TwitterID: yttw[video.Id]})
+		ytcr = append(ytcr, YouTubeCheckResponse{ID: video.Id, Title: video.Snippet.Title, Schedule: video.LiveStreamingDetails.ScheduledStartTime, TwitterID: yttw[video.Id]})
 
 		log.Info().
 			Str("severity", "INFO").
