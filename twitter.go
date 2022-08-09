@@ -204,6 +204,8 @@ func tweetSelect(gtc []GetTweetContext) ([]TwitterSearchResponse, error) {
 		// Redirect先のURLを取得
 		rid := resp.Header.Get("Location")
 
+		clog.Str("severity", "INFO").Str("redirect_url", rid).Send()
+
 		// URLからYouTubeの動画ID部分を抽出する
 		var yid string
 		idx = strings.Index(rid, "youtu.be")
@@ -219,7 +221,7 @@ func tweetSelect(gtc []GetTweetContext) ([]TwitterSearchResponse, error) {
 		}
 
 		tsr = append(tsr, TwitterSearchResponse{ID: v.ID, YouTubeID: yid, Text: v.Text})
-		clog.Str("severity", "INFO").Str("youtube_id", yid).Send()
+		// clog.Str("severity", "INFO").Str("youtube_id", yid).Str("youtube_url", rid).Send()
 	}
 	return tsr, nil
 }
