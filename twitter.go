@@ -217,6 +217,11 @@ func tweetSelect(gtc []GetTweetContext) ([]TwitterSearchResponse, error) {
 			if idx == -1 {
 				continue
 			}
+			// ショート動画であった場合
+			idx = strings.Index(rid, "youtube.com/shorts")
+			if idx != -1 {
+				continue
+			}
 			yid = rid[32:43]
 		}
 
