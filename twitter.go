@@ -213,6 +213,7 @@ func tweetSelect(gtc []GetTweetContext) ([]TwitterSearchResponse, error) {
 			yid = rid[17:28]
 		}
 		if idx == -1 {
+			// https://m.youtube.com/watch?v=zE9WP1N12yM
 			idx = strings.Index(rid, "youtube.com")
 			if idx == -1 {
 				continue
@@ -222,7 +223,7 @@ func tweetSelect(gtc []GetTweetContext) ([]TwitterSearchResponse, error) {
 			if idx != -1 {
 				continue
 			}
-			yid = rid[32:43]
+			yid = rid[30:41]
 		}
 
 		tsr = append(tsr, TwitterSearchResponse{ID: v.ID, YouTubeID: yid, Text: v.Text})
