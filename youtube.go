@@ -53,7 +53,7 @@ func (yt *Youtube) Check(tsr []TwitterSearchResponse) ([]YouTubeCheckResponse, e
 			continue
 		}
 		// 動画概要欄に特定の文字が含まれているか
-		if !regexp.MustCompile(`.*vocal|song|歌.*`).Match([]byte(video.Snippet.Description)) {
+		if !regexp.MustCompile(`.*vocal|Vocal|song|歌.*`).Match([]byte(video.Snippet.Description)) {
 			continue
 		}
 
