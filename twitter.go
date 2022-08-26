@@ -223,6 +223,11 @@ func tweetSelect(gtc []GetTweetContext) ([]TwitterSearchResponse, error) {
 			if idx != -1 {
 				continue
 			}
+			// チャンネルのリンクだった場合
+			idx = strings.Index(rid, "youtube.com/c")
+			if idx != -1 {
+				continue
+			}
 			yid = rid[30:41]
 		}
 
