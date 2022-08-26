@@ -130,7 +130,7 @@ func (tw *Twitter) Post(id string, text string) error {
 
 // にじさんじライバーのツイートを取得する
 func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
-	endpoint := "https://api.twitter.com/2/lists/1538799448679395328/tweets?expansions=author_id&user.fields=created_at&max_results=50"
+	endpoint := "https://api.twitter.com/2/lists/1538799448679395328/tweets?expansions=author_id&user.fields=created_at&max_results=30"
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
@@ -220,6 +220,11 @@ func tweetSelect(gtc []GetTweetContext) ([]TwitterSearchResponse, error) {
 			}
 			// ショート動画であった場合
 			idx = strings.Index(rid, "youtube.com/shorts")
+			if idx != -1 {
+				continue
+			}
+			// チャンネルのリンクだった場合
+			idx = strings.Index(rid, "youtube.com/c")
 			if idx != -1 {
 				continue
 			}
