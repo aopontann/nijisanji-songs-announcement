@@ -52,6 +52,20 @@ func (yt *Youtube) Check(tsr []TwitterSearchResponse) ([]YouTubeCheckResponse, e
 		if regexp.MustCompile(`.*切り抜き.*`).Match([]byte(video.Snippet.Title)) {
 			continue
 		}
+		// タイトルに特定の文字列が含まれているか
+		if regexp.MustCompile(`.*cover|Cover|歌って|MV.*`).Match([]byte(video.Snippet.Title)) {
+			ytcr = append(ytcr, YouTubeCheckResponse{ID: video.Id, Title: video.Snippet.Title, Schedule: video.LiveStreamingDetails.ScheduledStartTime, TwitterID: yttw[video.Id]})
+
+			log.Info().
+				Str("severity", "INFO").
+				Str("service", "youtube-video-check").
+				Str("id", video.Id).
+				Str("title", video.Snippet.Title).
+				Str("duration", video.ContentDetails.Duration).
+				Str("schedule", scheduledStartTime).
+				Send()
+			continue
+		}
 		// 動画概要欄に特定の文字が含まれているか
 		if !regexp.MustCompile(`.*vocal|Vocal|song|Song|歌|MV.*`).Match([]byte(video.Snippet.Description)) {
 			continue
@@ -69,4 +83,47 @@ func (yt *Youtube) Check(tsr []TwitterSearchResponse) ([]YouTubeCheckResponse, e
 			Send()
 	}
 	return ytcr, nil
+}
+
+// 動画IDからAPIを叩いて動画情報を取得し、DBに保存されている動画情報と異なるデータがある場合、新しい情報に上書きする
+// 上書きした場合やデータを削除した場合は true を返す
+func (yt *Youtube) CheckVideo(vid string) (bool, error) {
+	var title string
+	var scheTime string
+	// エラー表示に使うカスタムログの設定
+	clog := log.Error().Str("severity", "ERROR").Str("service", "youtube-check-video")
+	// Youtube Data API にリクエスト送信して動画情報を取得
+	call := YoutubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(vid).MaxResults(1)
+	res, err := call.Do()
+	if err != nil {
+		clog.Err(err).Msg("videos-list call error")
+		return false, err
+	}
+	// 動画が削除されていた場合、DBに保存されている動画情報も削除する
+	if len(res.Items) == 0 {
+		_, err := DB.Exec("DELETE FROM videos WHERE id = ?", vid)
+		if err != nil {
+			clog.Err(err).Msg("delete video error")
+			return false, err
+		}
+		return true, nil
+	}
+	// DBから動画情報を取得
+	err = DB.QueryRow("SELECT title, scheduled_start_time FROM videos WHERE id = ?", vid).Scan(&title, &scheTime)
+	if err != nil {
+		clog.Err(err).Msg("select video error")
+		return false, err
+	}
+	// DBに保存されている動画情報がAPIから取得したデータと異なる場合
+	if title != res.Items[0].Snippet.Title || scheTime != res.Items[0].LiveStreamingDetails.ScheduledStartTime {
+		// 新しい動画情報に上書きする
+		_, err := DB.Exec("UPDATE videos SET title = ?, scheduled_start_time = ? WHERE id = ?", title, scheTime, vid)
+		if err != nil {
+			clog.Err(err).Msg("Failed to overwrite")
+			return false, err
+		}
+		return true, nil
+	}
+	// DBに保存されている動画情報がAPIから取得したデータと同じ場合
+	return false, nil
 }
