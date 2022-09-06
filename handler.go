@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -54,8 +55,17 @@ func TwitterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, video := range videoList {
-		log.Info().Str("severity", "INFO").Str("service", "tweet").Str("id", video.Id).Str("title", video.Title).Send()
-		err := tw.Post(video.Id, video.Title)
+		changed, err := yt.CheckVideo(video.Id)
+		log.Info().Str("severity", "INFO").Str("service", "tweet").Str("id", video.Id).Str("title", video.Title).Str("changed", string(strconv.FormatBool(changed))).Send()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+			return
+		}
+		if changed {
+			continue
+		}
+		err = tw.Post(video.Id, video.Title)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
