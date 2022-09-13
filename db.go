@@ -8,8 +8,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type FireStore struct{}
-
 var DB *sql.DB
 
 func DBInit() {
