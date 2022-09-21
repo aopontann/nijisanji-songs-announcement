@@ -205,6 +205,8 @@ func (tw *Twitter) Select(tsr []TwitterSearchResponse) ([]YouTubeCheckResponse, 
 		id = append(id, v.YouTubeID)
 		yttw[v.YouTubeID] = v.ID
 	}
+	// にじさんじライバーのチャンネルリストを取得
+	channelIdList, err := GetChannelIdList()
 
 	call := YoutubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(strings.Join(id, ",")).MaxResults(50)
 	res, err := call.Do()
@@ -233,21 +235,25 @@ func (tw *Twitter) Select(tsr []TwitterSearchResponse) ([]YouTubeCheckResponse, 
 			continue
 		}
 		// タイトルに特定の文字列が含まれているか
-		if regexp.MustCompile(`.*cover|Cover|歌って|MV.*`).Match([]byte(video.Snippet.Title)) {
-			ytcr = append(ytcr, YouTubeCheckResponse{ID: video.Id, Title: video.Snippet.Title, Schedule: video.LiveStreamingDetails.ScheduledStartTime, TwitterID: yttw[video.Id]})
+		// if regexp.MustCompile(`.*cover|Cover|歌って|MV.*`).Match([]byte(video.Snippet.Title)) {
+		// 	ytcr = append(ytcr, YouTubeCheckResponse{ID: video.Id, Title: video.Snippet.Title, Schedule: video.LiveStreamingDetails.ScheduledStartTime, TwitterID: yttw[video.Id]})
 
-			log.Info().
-				Str("severity", "INFO").
-				Str("service", "youtube-video-check").
-				Str("id", video.Id).
-				Str("title", video.Snippet.Title).
-				Str("duration", video.ContentDetails.Duration).
-				Str("schedule", scheduledStartTime).
-				Send()
-			continue
-		}
-		// 動画概要欄に特定の文字が含まれているか
-		if !regexp.MustCompile(`.*vocal|Vocal|song|Song|歌|MV|作曲.*`).Match([]byte(video.Snippet.Description)) {
+		// 	log.Info().
+		// 		Str("severity", "INFO").
+		// 		Str("service", "youtube-video-check").
+		// 		Str("id", video.Id).
+		// 		Str("title", video.Snippet.Title).
+		// 		Str("duration", video.ContentDetails.Duration).
+		// 		Str("schedule", scheduledStartTime).
+		// 		Send()
+		// 	continue
+		// }
+		// // 動画概要欄に特定の文字が含まれているか
+		// if !regexp.MustCompile(`.*vocal|Vocal|song|Song|歌|MV|作曲.*`).Match([]byte(video.Snippet.Description)) {
+		// 	continue
+		// }
+		// にじさんじライバーのチャンネルで公開されたか
+		if !NijisanjiCheck(channelIdList, video.Snippet.ChannelId) {
 			continue
 		}
 
