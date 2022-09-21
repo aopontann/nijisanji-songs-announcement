@@ -102,7 +102,7 @@ func TwitterSearchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ytcr, err := yt.Check(tsr)
+	ytcr, err := tw.Select(tsr)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
