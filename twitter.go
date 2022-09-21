@@ -177,9 +177,10 @@ func tweetSelect(gtc []GetTweetContext) ([]TwitterSearchResponse, error) {
 	}
 	for _, v := range gtc {
 		clog := log.Info().Str("service", "twitter-select").Str("twitter_id", v.ID).Str("Text", v.Text)
-		// if !regexp.MustCompile(".*song|プレミア公開|MV|cover.*").Match([]byte(v.Text)) {
-		// 	continue
-		// }
+		// ツイート内容に"プレミア公開"の文字が含まれていた場合
+		if regexp.MustCompile(".*プレミア公開.*").Match([]byte(v.Text)) {
+			sendMail(v.ID, v.Text)
+		}
 		if regexp.MustCompile(".*RT.*").Match([]byte(v.Text)) {
 			continue
 		}
