@@ -173,6 +173,15 @@ func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
 
 	var tsr []TwitterSearchResponse
 	for _, tweet := range gtc.Data {
+		// ツイート内容に"公開"の文字が含まれている場合、メールを送る
+		if strings.Contains(tweet.Text, "公開") {
+			err := sendMail(tweet.ID, tweet.Text)
+			if err != nil {
+				twlog.Msg(err.Error())
+				return nil, err
+			}
+		}
+
 		yid, err := getRedirect(tweet.ID, tweet.Text)
 		if err != nil {
 			twlog.Msg(err.Error())
