@@ -43,8 +43,14 @@ func main() {
 		io.WriteString(w, "error-demo\n")
 	}
 
+	send :=  func(w http.ResponseWriter, _ *http.Request) {
+		sendMail("test", "test2-message")
+		io.WriteString(w, "send-demo\n")
+	}
+
 	http.HandleFunc("/ping", h1)
 	http.HandleFunc("/error", h2)
+	http.HandleFunc("/mail", send)
 	http.HandleFunc("/youtube", YoutubeHandler)
 	http.HandleFunc("/twitter", TwitterHandler)
 	http.HandleFunc("/twitter/search", TwitterSearchHandler)
