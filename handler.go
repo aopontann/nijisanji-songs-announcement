@@ -18,14 +18,28 @@ func YoutubeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vid, err := YoutubeSearchList()
+	vid, err := yt.Search()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 
-	err = YoutubeVideoList(vid)
+	yvr, err := yt.Video(vid)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	ysr, err := yt.Select(yvr)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	err = yt.Save(ysr)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
