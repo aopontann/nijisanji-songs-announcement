@@ -60,7 +60,7 @@ type ListTweetsEntities struct {
 		URL         string `json:"url"`
 		ExpandedURL string `json:"expanded_url"`
 		DisplayURL  string `json:"display_url"`
-		Status      int `json:"status"`
+		Status      int    `json:"status"`
 		Title       string `json:"title"`
 		Description string `json:"description"`
 		UnwoundURL  string `json:"unwound_url"`
@@ -69,9 +69,10 @@ type ListTweetsEntities struct {
 
 type ListTweetsResponse struct {
 	Data []struct {
-		Entities ListTweetsEntities `json:"entities"`
-		ID       string             `json:"id"`
-		Text     string             `json:"text"`
+		Entities  ListTweetsEntities `json:"entities"`
+		CreatedAt string             `json:"created_at"`
+		ID        string             `json:"id"`
+		Text      string             `json:"text"`
 	} `json:"data"`
 	Meta struct {
 		ResultCount int    `json:"result_count"`
@@ -164,7 +165,8 @@ func (tw *Twitter) Post(id string, text string) error {
 
 // にじさんじライバーのツイートを取得する
 func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
-	endpoint := "https://api.twitter.com/2/lists/1538799448679395328/tweets?tweet.fields=entities&expansions=referenced_tweets.id&max_results=20"
+	endpoint := "https://api.twitter.com/2/lists/1538799448679395328/tweets?tweet.fields=entities,created_at&max_results=30"
+	// https://api.twitter.com/2/lists/1538799448679395328/tweets?tweet.fields=entities,created_at&max_results=30
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
@@ -234,7 +236,7 @@ func (tw *Twitter) Select(tsr []TwitterSearchResponse) ([]YouTubeCheckResponse, 
 	}
 	// にじさんじライバーのチャンネルリストを取得
 	channelIdList, err := GetChannelIdList()
-	if (err != nil) {
+	if err != nil {
 		log.Info().Str("service", "twitter-select").Str("severity", "ERROR").Msg(err.Error())
 	}
 
@@ -308,7 +310,7 @@ func getUrl(entities ListTweetsEntities) string {
 		return ""
 	}
 	for _, url := range entities.Urls {
-		if (strings.Contains(url.ExpandedURL, "youtu.be") || strings.Contains(url.ExpandedURL, "youtube.com/watch")) {
+		if strings.Contains(url.ExpandedURL, "youtu.be") || strings.Contains(url.ExpandedURL, "youtube.com/watch") {
 			return url.ExpandedURL
 		}
 	}
