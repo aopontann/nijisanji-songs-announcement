@@ -94,9 +94,6 @@ var clint = &http.Client{
 // Searchで使用するカスタムエラーログ
 var twlog = log.Info().Str("service", "twitter-search").Str("severity", "ERROR")
 
-// getRedirectで使用するカスタムエラーログ
-var tgrlog = log.Info().Str("service", "twitter-getRedirect").Str("severity", "ERROR")
-
 // 歌動画の告知ツイート
 func (tw *Twitter) Post(id string, text string) error {
 	const endpoint = "https://api.twitter.com/2/tweets"
@@ -297,47 +294,6 @@ func (tw *Twitter) Select(tsr []TwitterSearchResponse) ([]YouTubeCheckResponse, 
 			Send()
 	}
 	return ytcr, nil
-}
-
-// ツイート内容にある短縮URLからリダイレクト先URLを取得する
-// Youtube動画リンクではない場合は""を返す
-func getRedirect(id string, text string) (string, error) {
-	idx := strings.Index(text, "https://t.co/")
-	// 短縮URLがない場合
-	if idx == -1 {
-		return "", nil
-	}
-	// 192行目のエラー回避処理
-	if len(text) < idx+23 {
-		tgrlog.Str("id", id).Str("text", "text").Msg("len(text) < idx+23 error")
-		return "", nil
-	}
-	// ツイート内容から短縮URL部分を抽出
-	sid := text[idx : idx+23]
-
-	// Redirect先のURLを取得
-	req, err := http.NewRequest("GET", sid, nil)
-	if err != nil {
-		return "", err
-	}
-	resp, err := clint.Do(req)
-	if err != nil {
-		tgrlog.Str("id", id).Str("text", "text").Msg("client.Do error")
-		return "", err
-	}
-	rid := resp.Header.Get("Location")
-
-	// リダイレクト先URLからYouTubeの動画ID部分を抽出する
-	idx = strings.Index(rid, "youtu.be")
-	if idx != -1 {
-		return rid[17:28], nil
-	}
-	idx = strings.Index(rid, "youtube.com")
-	if idx != -1 {
-		return rid[30:41], nil
-	}
-	// youtube動画のリンクでなかった場合
-	return "", nil
 }
 
 // ツイート内容からURLを取得する
