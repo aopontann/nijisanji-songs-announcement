@@ -85,12 +85,6 @@ type TwitterSearchResponse struct {
 	Text      string `json:"text"`
 }
 
-var clint = &http.Client{
-	CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	},
-}
-
 // Searchで使用するカスタムエラーログ
 var twlog = log.Info().Str("service", "twitter-search").Str("severity", "ERROR")
 
@@ -232,6 +226,9 @@ func (tw *Twitter) Select(tsr []TwitterSearchResponse) ([]YouTubeCheckResponse, 
 	}
 	// にじさんじライバーのチャンネルリストを取得
 	channelIdList, err := GetChannelIdList()
+	if (err != nil) {
+		log.Info().Str("service", "twitter-select").Str("severity", "ERROR").Msg(err.Error())
+	}
 
 	call := YoutubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(strings.Join(id, ",")).MaxResults(50)
 	res, err := call.Do()
