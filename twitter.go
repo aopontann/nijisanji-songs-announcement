@@ -239,6 +239,15 @@ func (tw *Twitter) Select(tsr []TwitterSearchResponse) ([]YouTubeCheckResponse, 
 
 	// 歌動画か判断する
 	for _, video := range res.Items {
+		log.Info().
+			Str("severity", "INFO").
+			Str("service", "twitter-select").
+			Str("twitter_id", yttw[video.Id]).
+			Str("id", video.Id).
+			Str("title", video.Snippet.Title).
+			Str("duration", video.ContentDetails.Duration).
+			Str("schedule", video.LiveStreamingDetails.ScheduledStartTime).
+			Send()
 		// プレミア公開する動画か
 		scheduledStartTime := "" // 例 2022-03-28T11:00:00Z
 		if video.LiveStreamingDetails != nil {
@@ -279,16 +288,7 @@ func (tw *Twitter) Select(tsr []TwitterSearchResponse) ([]YouTubeCheckResponse, 
 			continue
 		}
 
-		ytcr = append(ytcr, YouTubeCheckResponse{ID: video.Id, Title: video.Snippet.Title, Schedule: video.LiveStreamingDetails.ScheduledStartTime, TwitterID: yttw[video.Id]})
-
-		log.Info().
-			Str("severity", "INFO").
-			Str("service", "youtube-video-check").
-			Str("id", video.Id).
-			Str("title", video.Snippet.Title).
-			Str("duration", video.ContentDetails.Duration).
-			Str("schedule", scheduledStartTime).
-			Send()
+		ytcr = append(ytcr, YouTubeCheckResponse{ID: video.Id, Title: video.Snippet.Title, Schedule: scheduledStartTime, TwitterID: yttw[video.Id]})
 	}
 	return ytcr, nil
 }
