@@ -163,7 +163,7 @@ func (tw *Twitter) Post(id string, text string) error {
 	return nil
 }
 
-// にじさんじライバーのツイートを取得する
+// 過去10分間に投稿されたにじさんじライバーのツイートを取得する
 func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
 	endpoint := "https://api.twitter.com/2/lists/1538799448679395328/tweets?tweet.fields=entities,created_at&max_results=30"
 	// https://api.twitter.com/2/lists/1538799448679395328/tweets?tweet.fields=entities,created_at&max_results=30
@@ -198,6 +198,13 @@ func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
 
 	var tsr []TwitterSearchResponse
 	for _, tweet := range gtc.Data {
+		ago10m := time.Now().Add(-10 * time.Minute)
+		t, _ := time.Parse(time.RFC3339, tweet.CreatedAt)
+		// 10分前以上前にツイートの場合
+		if t.Before(ago10m) {
+			continue
+		}
+
 		// ツイート内容に"公開"の文字が含まれている場合、メールを送る
 		if strings.Contains(tweet.Text, "公開") {
 			err := sendMail(tweet.ID, tweet.Text)
