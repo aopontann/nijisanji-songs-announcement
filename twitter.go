@@ -205,6 +205,8 @@ func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
 			continue
 		}
 
+		log.Info().Str("severity", "INFO").Err(err).Str("id", tweet.ID).Str("text", tweet.Text).Send()
+
 		// ツイート内容に"公開"の文字が含まれている場合、メールを送る
 		if strings.Contains(tweet.Text, "公開") {
 			err := sendMail(tweet.ID, tweet.Text)
