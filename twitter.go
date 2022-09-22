@@ -27,49 +27,51 @@ type PostTweetContext struct {
 }
 
 type GetTweetContext struct {
-	ID       string `json:"id"`
-	Text     string `json:"text"`
+	ID   string `json:"id"`
+	Text string `json:"text"`
+}
+
+type ListTweetsEntities struct {
+	Annotations []struct {
+		Start          int     `json:"start"`
+		End            int     `json:"end"`
+		Probability    float64 `json:"probability"`
+		Type           string  `json:"type"`
+		NormalizedText string  `json:"normalized_text"`
+	} `json:"annotations"`
+	Cashtags []struct {
+		Start int    `json:"start"`
+		End   int    `json:"end"`
+		Tag   string `json:"tag"`
+	} `json:"cashtags"`
+	Hashtags []struct {
+		Start int    `json:"start"`
+		End   int    `json:"end"`
+		Tag   string `json:"tag"`
+	} `json:"hashtags"`
+	Mentions []struct {
+		Start int    `json:"start"`
+		End   int    `json:"end"`
+		Tag   string `json:"tag"`
+	} `json:"mentions"`
+	Urls []struct {
+		Start       int    `json:"start"`
+		End         int    `json:"end"`
+		URL         string `json:"url"`
+		ExpandedURL string `json:"expanded_url"`
+		DisplayURL  string `json:"display_url"`
+		Status      string `json:"status"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		UnwoundURL  string `json:"unwound_url"`
+	} `json:"urls"`
 }
 
 type ListTweetsResponse struct {
 	Data []struct {
-		Entities struct {
-			Annotations []struct {
-				Start          int     `json:"start"`
-				End            int     `json:"end"`
-				Probability    float64 `json:"probability"`
-				Type           string  `json:"type"`
-				NormalizedText string  `json:"normalized_text"`
-			} `json:"annotations"`
-			Cashtags []struct {
-				Start int    `json:"start"`
-				End   int    `json:"end"`
-				Tag   string `json:"tag"`
-			} `json:"cashtags"`
-			Hashtags []struct {
-				Start int    `json:"start"`
-				End   int    `json:"end"`
-				Tag   string `json:"tag"`
-			} `json:"hashtags"`
-			Mentions []struct {
-				Start int    `json:"start"`
-				End   int    `json:"end"`
-				Tag   string `json:"tag"`
-			} `json:"mentions"`
-			Urls []struct {
-				Start       int    `json:"start"`
-				End         int    `json:"end"`
-				URL         string `json:"url"`
-				ExpandedURL string `json:"expanded_url"`
-				DisplayURL  string `json:"display_url"`
-				Status      string `json:"status"`
-				Title       string `json:"title"`
-				Description string `json:"description"`
-				UnwoundURL  string `json:"unwound_url"`
-			} `json:"urls"`
-		} `json:"entities"`
-		ID   string `json:"id"`
-		Text string `json:"text"`
+		Entities ListTweetsEntities `json:"entities"`
+		ID       string             `json:"id"`
+		Text     string             `json:"text"`
 	} `json:"data"`
 	Meta struct {
 		ResultCount int    `json:"result_count"`
@@ -91,6 +93,7 @@ var clint = &http.Client{
 
 // Searchで使用するカスタムエラーログ
 var twlog = log.Info().Str("service", "twitter-search").Str("severity", "ERROR")
+
 // getRedirectで使用するカスタムエラーログ
 var tgrlog = log.Info().Str("service", "twitter-getRedirect").Str("severity", "ERROR")
 
@@ -340,3 +343,5 @@ func getRedirect(id string, text string) (string, error) {
 	// youtube動画のリンクでなかった場合
 	return "", nil
 }
+
+func getUrl()
