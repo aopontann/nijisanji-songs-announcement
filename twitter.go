@@ -27,21 +27,50 @@ type PostTweetContext struct {
 }
 
 type GetTweetContext struct {
-	AuthorID string `json:"author_id"`
 	ID       string `json:"id"`
 	Text     string `json:"text"`
 }
 
-type ListsResponse struct {
-	Data     []GetTweetContext `json:"data"`
-	Includes struct {
-		Users []struct {
-			CreatedAt time.Time `json:"created_at"`
-			ID        string    `json:"id"`
-			Name      string    `json:"name"`
-			Username  string    `json:"username"`
-		} `json:"users"`
-	} `json:"includes"`
+type ListTweetsResponse struct {
+	Data []struct {
+		Entities struct {
+			Annotations []struct {
+				Start          int     `json:"start"`
+				End            int     `json:"end"`
+				Probability    float64 `json:"probability"`
+				Type           string  `json:"type"`
+				NormalizedText string  `json:"normalized_text"`
+			} `json:"annotations"`
+			Cashtags []struct {
+				Start int    `json:"start"`
+				End   int    `json:"end"`
+				Tag   string `json:"tag"`
+			} `json:"cashtags"`
+			Hashtags []struct {
+				Start int    `json:"start"`
+				End   int    `json:"end"`
+				Tag   string `json:"tag"`
+			} `json:"hashtags"`
+			Mentions []struct {
+				Start int    `json:"start"`
+				End   int    `json:"end"`
+				Tag   string `json:"tag"`
+			} `json:"mentions"`
+			Urls []struct {
+				Start       int    `json:"start"`
+				End         int    `json:"end"`
+				URL         string `json:"url"`
+				ExpandedURL string `json:"expanded_url"`
+				DisplayURL  string `json:"display_url"`
+				Status      string `json:"status"`
+				Title       string `json:"title"`
+				Description string `json:"description"`
+				UnwoundURL  string `json:"unwound_url"`
+			} `json:"urls"`
+		} `json:"entities"`
+		ID   string `json:"id"`
+		Text string `json:"text"`
+	} `json:"data"`
 	Meta struct {
 		ResultCount int    `json:"result_count"`
 		NextToken   string `json:"next_token"`
@@ -141,7 +170,7 @@ func (tw *Twitter) Post(id string, text string) error {
 
 // にじさんじライバーのツイートを取得する
 func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
-	endpoint := "https://api.twitter.com/2/lists/1538799448679395328/tweets?expansions=author_id&user.fields=created_at&max_results=30"
+	endpoint := "https://api.twitter.com/2/lists/1538799448679395328/tweets?tweet.fields=entities&expansions=referenced_tweets.id&max_results=30"
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
@@ -165,7 +194,7 @@ func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
 		return nil, err
 	}
 
-	var gtc ListsResponse
+	var gtc ListTweetsResponse
 	if err := json.Unmarshal(body, &gtc); err != nil {
 		twlog.Msg(err.Error())
 		return nil, err
