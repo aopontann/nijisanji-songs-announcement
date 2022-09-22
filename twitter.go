@@ -27,21 +27,52 @@ type PostTweetContext struct {
 }
 
 type GetTweetContext struct {
-	AuthorID string `json:"author_id"`
-	ID       string `json:"id"`
-	Text     string `json:"text"`
+	ID   string `json:"id"`
+	Text string `json:"text"`
 }
 
-type ListsResponse struct {
-	Data     []GetTweetContext `json:"data"`
-	Includes struct {
-		Users []struct {
-			CreatedAt time.Time `json:"created_at"`
-			ID        string    `json:"id"`
-			Name      string    `json:"name"`
-			Username  string    `json:"username"`
-		} `json:"users"`
-	} `json:"includes"`
+type ListTweetsEntities struct {
+	Annotations []struct {
+		Start          int     `json:"start"`
+		End            int     `json:"end"`
+		Probability    float64 `json:"probability"`
+		Type           string  `json:"type"`
+		NormalizedText string  `json:"normalized_text"`
+	} `json:"annotations"`
+	Cashtags []struct {
+		Start int    `json:"start"`
+		End   int    `json:"end"`
+		Tag   string `json:"tag"`
+	} `json:"cashtags"`
+	Hashtags []struct {
+		Start int    `json:"start"`
+		End   int    `json:"end"`
+		Tag   string `json:"tag"`
+	} `json:"hashtags"`
+	Mentions []struct {
+		Start int    `json:"start"`
+		End   int    `json:"end"`
+		Tag   string `json:"tag"`
+	} `json:"mentions"`
+	Urls []struct {
+		Start       int    `json:"start"`
+		End         int    `json:"end"`
+		URL         string `json:"url"`
+		ExpandedURL string `json:"expanded_url"`
+		DisplayURL  string `json:"display_url"`
+		Status      string `json:"status"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		UnwoundURL  string `json:"unwound_url"`
+	} `json:"urls"`
+}
+
+type ListTweetsResponse struct {
+	Data []struct {
+		Entities ListTweetsEntities `json:"entities"`
+		ID       string             `json:"id"`
+		Text     string             `json:"text"`
+	} `json:"data"`
 	Meta struct {
 		ResultCount int    `json:"result_count"`
 		NextToken   string `json:"next_token"`
@@ -54,16 +85,8 @@ type TwitterSearchResponse struct {
 	Text      string `json:"text"`
 }
 
-var clint = &http.Client{
-	CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	},
-}
-
 // Searchで使用するカスタムエラーログ
 var twlog = log.Info().Str("service", "twitter-search").Str("severity", "ERROR")
-// getRedirectで使用するカスタムエラーログ
-var tgrlog = log.Info().Str("service", "twitter-getRedirect").Str("severity", "ERROR")
 
 // 歌動画の告知ツイート
 func (tw *Twitter) Post(id string, text string) error {
@@ -141,7 +164,7 @@ func (tw *Twitter) Post(id string, text string) error {
 
 // にじさんじライバーのツイートを取得する
 func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
-	endpoint := "https://api.twitter.com/2/lists/1538799448679395328/tweets?expansions=author_id&user.fields=created_at&max_results=30"
+	endpoint := "https://api.twitter.com/2/lists/1538799448679395328/tweets?tweet.fields=entities&expansions=referenced_tweets.id&max_results=30"
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
@@ -165,7 +188,7 @@ func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
 		return nil, err
 	}
 
-	var gtc ListsResponse
+	var gtc ListTweetsResponse
 	if err := json.Unmarshal(body, &gtc); err != nil {
 		twlog.Msg(err.Error())
 		return nil, err
@@ -182,12 +205,16 @@ func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
 			}
 		}
 
-		yid, err := getRedirect(tweet.ID, tweet.Text)
-		if err != nil {
-			twlog.Msg(err.Error())
-			return nil, err
-		}
+		yid := getUrl(tweet.Entities)
 		if yid != "" {
+			// ツイートに"公開"の文字列が含まれていないが、YouTubeのリンクが含まれていた場合、メールの送信
+			if !strings.Contains(tweet.Text, "公開") {
+				err := sendMail(tweet.ID, tweet.Text)
+				if err != nil {
+					twlog.Msg(err.Error())
+					return nil, err
+				}
+			}
 			tsr = append(tsr, TwitterSearchResponse{ID: tweet.ID, YouTubeID: yid, Text: tweet.Text})
 		}
 	}
@@ -207,6 +234,9 @@ func (tw *Twitter) Select(tsr []TwitterSearchResponse) ([]YouTubeCheckResponse, 
 	}
 	// にじさんじライバーのチャンネルリストを取得
 	channelIdList, err := GetChannelIdList()
+	if (err != nil) {
+		log.Info().Str("service", "twitter-select").Str("severity", "ERROR").Msg(err.Error())
+	}
 
 	call := YoutubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(strings.Join(id, ",")).MaxResults(50)
 	res, err := call.Do()
@@ -217,6 +247,15 @@ func (tw *Twitter) Select(tsr []TwitterSearchResponse) ([]YouTubeCheckResponse, 
 
 	// 歌動画か判断する
 	for _, video := range res.Items {
+		log.Info().
+			Str("severity", "INFO").
+			Str("service", "twitter-select").
+			Str("twitter_id", yttw[video.Id]).
+			Str("id", video.Id).
+			Str("title", video.Snippet.Title).
+			Str("duration", video.ContentDetails.Duration).
+			Str("schedule", video.LiveStreamingDetails.ScheduledStartTime).
+			Send()
 		// プレミア公開する動画か
 		scheduledStartTime := "" // 例 2022-03-28T11:00:00Z
 		if video.LiveStreamingDetails != nil {
@@ -257,57 +296,21 @@ func (tw *Twitter) Select(tsr []TwitterSearchResponse) ([]YouTubeCheckResponse, 
 			continue
 		}
 
-		ytcr = append(ytcr, YouTubeCheckResponse{ID: video.Id, Title: video.Snippet.Title, Schedule: video.LiveStreamingDetails.ScheduledStartTime, TwitterID: yttw[video.Id]})
-
-		log.Info().
-			Str("severity", "INFO").
-			Str("service", "youtube-video-check").
-			Str("id", video.Id).
-			Str("title", video.Snippet.Title).
-			Str("duration", video.ContentDetails.Duration).
-			Str("schedule", scheduledStartTime).
-			Send()
+		ytcr = append(ytcr, YouTubeCheckResponse{ID: video.Id, Title: video.Snippet.Title, Schedule: scheduledStartTime, TwitterID: yttw[video.Id]})
 	}
 	return ytcr, nil
 }
 
-// ツイート内容にある短縮URLからリダイレクト先URLを取得する
+// ツイート内容からURLを取得する
 // Youtube動画リンクではない場合は""を返す
-func getRedirect(id string, text string) (string, error) {
-	idx := strings.Index(text, "https://t.co/")
-	// 短縮URLがない場合
-	if idx == -1 {
-		return "", nil
+func getUrl(entities ListTweetsEntities) string {
+	if entities.Urls == nil {
+		return ""
 	}
-	// 192行目のエラー回避処理
-	if len(text) < idx+23 {
-		tgrlog.Str("id", id).Str("text", "text").Msg("len(text) < idx+23 error")
-		return "", nil
+	for _, url := range entities.Urls {
+		if (strings.Contains(url.ExpandedURL, "youtu.be") || strings.Contains(url.ExpandedURL, "youtube.com/watch")) {
+			return url.ExpandedURL
+		}
 	}
-	// ツイート内容から短縮URL部分を抽出
-	sid := text[idx : idx+23]
-
-	// Redirect先のURLを取得
-	req, err := http.NewRequest("GET", sid, nil)
-	if err != nil {
-		return "", err
-	}
-	resp, err := clint.Do(req)
-	if err != nil {
-		tgrlog.Str("id", id).Str("text", "text").Msg("client.Do error")
-		return "", err
-	}
-	rid := resp.Header.Get("Location")
-
-	// リダイレクト先URLからYouTubeの動画ID部分を抽出する
-	idx = strings.Index(rid, "youtu.be")
-	if idx != -1 {
-		return rid[17:28], nil
-	}
-	idx = strings.Index(rid, "youtube.com")
-	if idx != -1 {
-		return rid[30:41], nil
-	}
-	// youtube動画のリンクでなかった場合
-	return "", nil
+	return ""
 }
