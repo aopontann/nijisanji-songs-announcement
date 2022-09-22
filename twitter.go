@@ -164,7 +164,7 @@ func (tw *Twitter) Post(id string, text string) error {
 
 // にじさんじライバーのツイートを取得する
 func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
-	endpoint := "https://api.twitter.com/2/lists/1538799448679395328/tweets?tweet.fields=entities&expansions=referenced_tweets.id&max_results=30"
+	endpoint := "https://api.twitter.com/2/lists/1538799448679395328/tweets?tweet.fields=entities&expansions=referenced_tweets.id&max_results=20"
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
