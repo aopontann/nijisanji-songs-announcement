@@ -207,6 +207,14 @@ func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
 
 		yid := getUrl(tweet.Entities)
 		if yid != "" {
+			// ツイートに"公開"の文字列が含まれていないが、YouTubeのリンクが含まれていた場合、メールの送信
+			if !strings.Contains(tweet.Text, "公開") {
+				err := sendMail(tweet.ID, tweet.Text)
+				if err != nil {
+					twlog.Msg(err.Error())
+					return nil, err
+				}
+			}
 			tsr = append(tsr, TwitterSearchResponse{ID: tweet.ID, YouTubeID: yid, Text: tweet.Text})
 		}
 	}
