@@ -214,11 +214,7 @@ func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
 			}
 		}
 
-		yid, err := getRedirect(tweet.ID, tweet.Text)
-		if err != nil {
-			twlog.Msg(err.Error())
-			return nil, err
-		}
+		yid := getUrl(tweet.Entities)
 		if yid != "" {
 			tsr = append(tsr, TwitterSearchResponse{ID: tweet.ID, YouTubeID: yid, Text: tweet.Text})
 		}
@@ -344,4 +340,16 @@ func getRedirect(id string, text string) (string, error) {
 	return "", nil
 }
 
-func getUrl()
+// ツイート内容からURLを取得する
+// Youtube動画リンクではない場合は""を返す
+func getUrl(entities ListTweetsEntities) string {
+	if entities.Urls == nil {
+		return ""
+	}
+	for _, url := range entities.Urls {
+		if (strings.Contains(url.ExpandedURL, "youtu.be") || strings.Contains(url.ExpandedURL, "youtube.com/watch")) {
+			return url.ExpandedURL
+		}
+	}
+	return ""
+}
