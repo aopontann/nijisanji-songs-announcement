@@ -166,7 +166,6 @@ func (tw *Twitter) Post(id string, text string) error {
 // 過去10分間に投稿されたにじさんじライバーのツイートを取得する
 func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
 	endpoint := "https://api.twitter.com/2/lists/1538799448679395328/tweets?tweet.fields=entities,created_at&max_results=30"
-	// https://api.twitter.com/2/lists/1538799448679395328/tweets?tweet.fields=entities,created_at&max_results=30
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
@@ -205,7 +204,7 @@ func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
 			continue
 		}
 
-		log.Info().Str("severity", "INFO").Err(err).Str("id", tweet.ID).Str("text", tweet.Text).Send()
+		log.Info().Str("severity", "INFO").Str("service", "tweet-search").Str("id", tweet.ID).Str("text", tweet.Text).Send()
 
 		// ツイート内容に"公開"の文字が含まれている場合、メールを送る
 		if strings.Contains(tweet.Text, "公開") {
