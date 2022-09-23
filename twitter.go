@@ -217,8 +217,13 @@ func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
 
 		yid := getUrl(tweet.Entities)
 		if yid != "" {
-			// ツイートに"公開"の文字列が含まれていないが、YouTubeのリンクが含まれていた場合、メールの送信
-			if !strings.Contains(tweet.Text, "公開") {
+			video, err := yt.Video([]string{yid})
+			if err != nil {
+				twlog.Msg(err.Error())
+				return nil, err
+			}
+			// 生放送の動画ではない場合
+			if video[0].Duration != "P0D" {
 				err := sendMail(tweet.ID, tweet.Text)
 				if err != nil {
 					twlog.Msg(err.Error())
