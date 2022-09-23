@@ -323,8 +323,12 @@ func getUrl(entities ListTweetsEntities) string {
 		return ""
 	}
 	for _, url := range entities.Urls {
-		if strings.Contains(url.ExpandedURL, "youtu.be") || strings.Contains(url.ExpandedURL, "youtube.com/watch") {
-			return url.ExpandedURL
+		if strings.Contains(url.ExpandedURL, "youtu.be") {
+			return url.ExpandedURL[17:28]
+		}
+		// https://www.youtube.com/watch?v=PBf70efxSkI
+		if strings.Contains(url.ExpandedURL, "youtube.com/watch") {
+			return url.ExpandedURL[32:43]
 		}
 	}
 	return ""
