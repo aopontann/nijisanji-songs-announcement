@@ -78,8 +78,13 @@ func (yt *Youtube) Search() ([]string, error) {
 // Youtube Data API から動画情報を取得
 func (yt *Youtube) Video(vid []string) ([]YoutubeVideoResponse, error) {
 	var yvs []YoutubeVideoResponse
-	for i := 0; i*50 < len(vid); i++ {
-		id := strings.Join(vid[50*i:50*(i+1)], ",")
+	for i := 0; i*50 <= len(vid); i++ {
+		var id string
+		if len(vid) > 50*(i+1) {
+			id = strings.Join(vid[50*i:50*(i+1)], ",")
+		} else {
+			id = strings.Join(vid[50*i:], ",")
+		}
 		call := YoutubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(id).MaxResults(50)
 		res, err := call.Do()
 		if err != nil {
