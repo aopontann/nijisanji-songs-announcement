@@ -328,7 +328,7 @@ func getUrl(entities ListTweetsEntities) string {
 		log.Info().Str("severity", "INFO").Str("service", "tweet-getURL").Str("url", url.ExpandedURL).Send()
 		idx := strings.Index(url.ExpandedURL, "youtu.be")
 		if idx != -1 {
-			return url.ExpandedURL[idx+9:]
+			return url.ExpandedURL[idx+9:idx+20]
 		}
 		// https://www.youtube.com/watch?v=PBf70efxSkI
 		if strings.Contains(url.ExpandedURL, "youtube.com/watch") {
