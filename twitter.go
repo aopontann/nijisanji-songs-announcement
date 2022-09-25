@@ -222,8 +222,8 @@ func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
 				twlog.Msg(err.Error())
 				return nil, err
 			}
-			// 生放送の動画ではない場合
-			if video[0].Duration != "P0D" {
+			// 生放送の動画ではない、公開時間が指定されている場合
+			if video[0].Duration != "P0D" && video[0].Schedule != "" {
 				err := sendMail(tweet.ID, tweet.Text)
 				if err != nil {
 					twlog.Msg(err.Error())
