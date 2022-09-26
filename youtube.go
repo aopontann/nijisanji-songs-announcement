@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"google.golang.org/api/youtube/v3"
 )
 
 type Youtube struct{}
@@ -112,6 +113,27 @@ func (yt *Youtube) Video(vid []string) ([]YoutubeVideoResponse, error) {
 				Str("channel_id", video.Snippet.ChannelId).
 				Send()
 		}
+	}
+	return yvs, nil
+}
+
+// Youtube Data API から動画情報を取得
+func (yt *Youtube) Video2(vid []string) ([]*youtube.Video, error) {
+	var yvs []*youtube.Video
+	for i := 0; i*50 <= len(vid); i++ {
+		var id string
+		if len(vid) > 50*(i+1) {
+			id = strings.Join(vid[50*i:50*(i+1)], ",")
+		} else {
+			id = strings.Join(vid[50*i:], ",")
+		}
+		call := YoutubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(id).MaxResults(50)
+		res, err := call.Do()
+		if err != nil {
+			log.Error().Str("severity", "ERROR").Err(err).Msg("videos-list call error")
+			return []*youtube.Video{}, err
+		}
+		yvs = append(yvs, res.Items...)
 	}
 	return yvs, nil
 }
