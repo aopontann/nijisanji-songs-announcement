@@ -325,42 +325,82 @@ func tweetsFilter(ltd []ListTweetsData) []ListTweetsData {
 	return twData
 }
 
-func sendMailTweet() {
-	/*
-// ツイート内容に"公開"の文字が含まれている場合、メールを送る
-		if strings.Contains(tweet.Text, "公開") {
-			err := sendMail(tweet.ID, tweet.Text)
+func (tw *Twitter) Mail(tsr []TwitterSearchResponse) error {
+	clog := log.Error().Str("severity", "ERROR").Str("service", "twitter-mail")
+	for _, t := range tsr {
+		// ツイート内容に"公開"の文字が含まれている場合、メールを送る
+		if strings.Contains(t.Text, "公開") {
+			err := sendMail(t.ID, t.Text)
 			if err != nil {
-				twlog.Msg(err.Error())
-				return nil, err
+				clog.Str("id", t.ID).Str("text", t.Text).Msg(err.Error())
+				return err
 			}
+			continue
 		}
-
-		if yid != "" {
-			call := YoutubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(yid).MaxResults(1)
-			res, err := call.Do()
-			if err != nil {
-				twlog.Err(err).Msg("videos-list call error")
-				return nil, err
-			}
-			// 生放送の動画ではない、公開時間が指定されている場合
-			if video[0].Duration != "P0D" && video[0].Schedule != "" {
-				err := sendMail(tweet.ID, tweet.Text)
-				if err != nil {
-					twlog.Msg(err.Error())
-					return nil, err
-				}
-			}
-			tsr = append(tsr, TwitterSearchResponse{ID: tweet.ID, YouTubeID: yid, Text: tweet.Text})
+		// ツイートにYoutubeのURLが含まれていない場合
+		if t.YoutubeData == nil {
+			continue
+		}
+		// Youtube動画の情報
+		var video = t.YoutubeData
+		if video.LiveStreamingDetails == nil {
+			continue
+		}
+		// 放送前ではない場合
+		if video.Snippet.LiveBroadcastContent != "upcoming" {
+			continue
+		}
+		// 生放送の動画であった場合
+		// 生放送でも終了後に"PT3H12M23S"のようになるが、LiveBroadcastContentが"upcoming"ではなくなるため上の条件に当てはまる
+		if video.ContentDetails.Duration == "P0D" {
+			continue
+		}
+		// ツイートIDとツイート内容をメールの送信
+		err := sendMail(t.ID, t.Text)
+		if err != nil {
+			clog.Str("id", t.ID).Str("text", t.Text).Msg(err.Error())
+			return err
 		}
 	}
-	// 生放送の動画ではない、公開時間が指定されている場合
-		if video.ContentDetails.Duration != "P0D" && video.LiveStreamingDetails.ScheduledStartTime != "" {
-			err := sendMail(yttw[video.Id], tweet.Text)
-			if err != nil {
-				twlog.Msg(err.Error())
-				return nil, err
+	return nil
+}
+
+func sendMailTweet() {
+	/*
+		// ツイート内容に"公開"の文字が含まれている場合、メールを送る
+				if strings.Contains(tweet.Text, "公開") {
+					err := sendMail(tweet.ID, tweet.Text)
+					if err != nil {
+						twlog.Msg(err.Error())
+						return nil, err
+					}
+				}
+
+				if yid != "" {
+					call := YoutubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(yid).MaxResults(1)
+					res, err := call.Do()
+					if err != nil {
+						twlog.Err(err).Msg("videos-list call error")
+						return nil, err
+					}
+					// 生放送の動画ではない、公開時間が指定されている場合
+					if video[0].Duration != "P0D" && video[0].Schedule != "" {
+						err := sendMail(tweet.ID, tweet.Text)
+						if err != nil {
+							twlog.Msg(err.Error())
+							return nil, err
+						}
+					}
+					tsr = append(tsr, TwitterSearchResponse{ID: tweet.ID, YouTubeID: yid, Text: tweet.Text})
+				}
 			}
-		}
+			// 生放送の動画ではない、公開時間が指定されている場合
+				if video.ContentDetails.Duration != "P0D" && video.LiveStreamingDetails.ScheduledStartTime != "" {
+					err := sendMail(yttw[video.Id], tweet.Text)
+					if err != nil {
+						twlog.Msg(err.Error())
+						return nil, err
+					}
+				}
 	*/
 }
