@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"google.golang.org/api/youtube/v3"
 )
 
 type Twitter struct{}
@@ -67,13 +68,15 @@ type ListTweetsEntities struct {
 	} `json:"urls"`
 }
 
+type ListTweetsData struct {
+	Entities  ListTweetsEntities `json:"entities"`
+	CreatedAt string             `json:"created_at"`
+	ID        string             `json:"id"`
+	Text      string             `json:"text"`
+}
+
 type ListTweetsResponse struct {
-	Data []struct {
-		Entities  ListTweetsEntities `json:"entities"`
-		CreatedAt string             `json:"created_at"`
-		ID        string             `json:"id"`
-		Text      string             `json:"text"`
-	} `json:"data"`
+	Data []ListTweetsData `json:"data"`
 	Meta struct {
 		ResultCount int    `json:"result_count"`
 		NextToken   string `json:"next_token"`
@@ -81,9 +84,9 @@ type ListTweetsResponse struct {
 }
 
 type TwitterSearchResponse struct {
-	ID        string `json:"id"`
-	YouTubeID string `json:"youtube_id"`
-	Text      string `json:"text"`
+	ID          string         `json:"id"`
+	Text        string         `json:"text"`
+	YoutubeData *youtube.Video `json:"youtube_data"`
 }
 
 // Searchで使用するカスタムエラーログ
@@ -195,18 +198,136 @@ func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
 		return nil, err
 	}
 
+	twData := tweetsFilter(gtc.Data)
+
+	// ツイートに含まれている可能性がある動画IDを保存する配列
+	var yidList []string
+	for _, tweet := range twData {
+		yid := getUrl(tweet.Entities)
+		if yid != "" {
+			yidList = append(yidList, yid)
+		}
+	}
+
+	// Youtube Data APIから動画情報を取得
+	videos, err := yt.Video2(yidList)
+	if err != nil {
+		twlog.Msg(err.Error())
+		return nil, err
+	}
+	// youtubeIDをキーとし、動画情報を値をとしたmap配列
+	mapVideos := make(map[string]*youtube.Video)
+	for _, video := range videos {
+		mapVideos[video.Id] = video
+	}
+
+	// 返り値にYoutube Data APIのレスポンス結果も付属させる
 	var tsr []TwitterSearchResponse
-	for _, tweet := range gtc.Data {
+	for _, tweet := range twData {
+		log.Info().Str("severity", "INFO").Str("service", "tweet-search").Str("id", tweet.ID).Str("text", tweet.Text).Send()
+
+		yid := getUrl(tweet.Entities)
+		if yid != "" {
+			tsr = append(tsr, TwitterSearchResponse{ID: tweet.ID, Text: tweet.Text, YoutubeData: mapVideos[yid]})
+		} else {
+			tsr = append(tsr, TwitterSearchResponse{ID: tweet.ID, Text: tweet.Text})
+		}
+	}
+	return tsr, nil
+}
+
+// プレミア公開される歌ってみた動画のみ返ってくる
+// 動画IDから動画詳細情報を取得して歌動画か判断する
+func (tw *Twitter) Select(tsr []TwitterSearchResponse) ([]TwitterSearchResponse, error) {
+	var ytcr []TwitterSearchResponse
+	// にじさんじライバーのチャンネルリストを取得
+	channelIdList, err := GetChannelIdList()
+	if err != nil {
+		log.Info().Str("service", "twitter-select").Str("severity", "ERROR").Msg("GetChannelIdList() error")
+	}
+
+	for _, t := range tsr {
+		// ツイートに動画IDがなかった場合
+		if t.YoutubeData == nil {
+			continue
+		}
+		video := t.YoutubeData
+		// プレミア公開する動画ではない場合
+		if video.LiveStreamingDetails == nil {
+			continue
+		}
+		// 動画の長さが9分59秒以下ではない場合
+		if !regexp.MustCompile(`^PT([1-9]M[1-5]?[0-9]S|[1-5]?[0-9]S)`).Match([]byte(video.ContentDetails.Duration)) {
+			continue
+		}
+		// 切り抜き動画である場合
+		if regexp.MustCompile(`.*切り抜き.*`).Match([]byte(video.Snippet.Title)) {
+			continue
+		}
+		// にじさんじライバーのチャンネルで公開されていない場合
+		if !NijisanjiCheck(channelIdList, video.Snippet.ChannelId) {
+			continue
+		}
+
+		// フィルターをくくり抜けたデータのみログを表示
+		log.Info().
+			Str("severity", "INFO").
+			Str("service", "twitter-select").
+			Str("twitter_id", t.ID).
+			Str("id", video.Id).
+			Str("title", video.Snippet.Title).
+			Str("duration", video.ContentDetails.Duration).
+			Str("schedule", video.LiveStreamingDetails.ScheduledStartTime).
+			Send()
+
+		ytcr = append(ytcr, t)
+	}
+	return ytcr, nil
+}
+
+// ツイート内容からURLを取得する
+// Youtube動画リンクではない場合は""を返す
+func getUrl(entities ListTweetsEntities) string {
+	if entities.Urls == nil {
+		return ""
+	}
+	vid := ""
+	for _, url := range entities.Urls {
+		idx := strings.Index(url.ExpandedURL, "youtu.be")
+		if idx != -1 {
+			vid = url.ExpandedURL[idx+9 : idx+20]
+		}
+		// https://www.youtube.com/watch?v=PBf70efxSkI
+		if strings.Contains(url.ExpandedURL, "youtube.com/watch") {
+			vid = url.ExpandedURL[32:43]
+		}
+		log.Info().Str("severity", "INFO").Str("service", "tweet-getURL").Str("url", url.ExpandedURL).Str("vid", vid).Send()
+		if vid != "" {
+			return vid
+		}
+	}
+	return ""
+}
+
+// 取得した複数のツイートをフィルターにかける
+func tweetsFilter(ltd []ListTweetsData) []ListTweetsData {
+	// ツイートの情報を格納する
+	var twData []ListTweetsData
+	for _, tweet := range ltd {
 		ago10m := time.Now().Add(-10 * time.Minute)
 		t, _ := time.Parse(time.RFC3339, tweet.CreatedAt)
 		// 10分前以上前にツイートの場合
 		if t.Before(ago10m) {
 			continue
 		}
+		twData = append(twData, tweet)
+	}
+	return twData
+}
 
-		log.Info().Str("severity", "INFO").Str("service", "tweet-search").Str("id", tweet.ID).Str("text", tweet.Text).Send()
-
-		// ツイート内容に"公開"の文字が含まれている場合、メールを送る
+func sendMailTweet() {
+	/*
+// ツイート内容に"公開"の文字が含まれている場合、メールを送る
 		if strings.Contains(tweet.Text, "公開") {
 			err := sendMail(tweet.ID, tweet.Text)
 			if err != nil {
@@ -215,11 +336,11 @@ func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
 			}
 		}
 
-		yid := getUrl(tweet.Entities)
 		if yid != "" {
-			video, err := yt.Video([]string{yid})
+			call := YoutubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(yid).MaxResults(1)
+			res, err := call.Do()
 			if err != nil {
-				twlog.Msg(err.Error())
+				twlog.Err(err).Msg("videos-list call error")
 				return nil, err
 			}
 			// 生放送の動画ではない、公開時間が指定されている場合
@@ -233,107 +354,13 @@ func (tw *Twitter) Search() ([]TwitterSearchResponse, error) {
 			tsr = append(tsr, TwitterSearchResponse{ID: tweet.ID, YouTubeID: yid, Text: tweet.Text})
 		}
 	}
-
-	return tsr, nil
-}
-
-// プレミア公開される歌ってみた動画のみ返ってくる
-// 動画IDから動画詳細情報を取得して歌動画か判断する
-func (tw *Twitter) Select(tsr []TwitterSearchResponse) ([]YouTubeCheckResponse, error) {
-	var ytcr []YouTubeCheckResponse
-	var id []string
-	yttw := make(map[string]string)
-	for _, v := range tsr {
-		id = append(id, v.YouTubeID)
-		yttw[v.YouTubeID] = v.ID
-	}
-	// にじさんじライバーのチャンネルリストを取得
-	channelIdList, err := GetChannelIdList()
-	if err != nil {
-		log.Info().Str("service", "twitter-select").Str("severity", "ERROR").Msg("GetChannelIdList() error")
-	}
-
-	call := YoutubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(strings.Join(id, ",")).MaxResults(50)
-	res, err := call.Do()
-	if err != nil {
-		log.Error().Str("severity", "ERROR").Err(err).Msg("videos-list call error")
-		return nil, err
-	}
-
-	// 歌動画か判断する
-	for _, video := range res.Items {
-		// プレミア公開する動画か
-		scheduledStartTime := "" // 例 2022-03-28T11:00:00Z
-		if video.LiveStreamingDetails != nil {
-			// "2022-03-28 11:00:00"形式に変換
-			rep1 := strings.Replace(video.LiveStreamingDetails.ScheduledStartTime, "T", " ", 1)
-			scheduledStartTime = strings.Replace(rep1, "Z", "", 1)
-		} else {
-			continue
+	// 生放送の動画ではない、公開時間が指定されている場合
+		if video.ContentDetails.Duration != "P0D" && video.LiveStreamingDetails.ScheduledStartTime != "" {
+			err := sendMail(yttw[video.Id], tweet.Text)
+			if err != nil {
+				twlog.Msg(err.Error())
+				return nil, err
+			}
 		}
-		// 動画の長さが9分59秒以下ではない場合
-		if !regexp.MustCompile(`^PT([1-9]M[1-5]?[0-9]S|[1-5]?[0-9]S)`).Match([]byte(video.ContentDetails.Duration)) {
-			continue
-		}
-		// 切り抜き動画である場合
-		if regexp.MustCompile(`.*切り抜き.*`).Match([]byte(video.Snippet.Title)) {
-			continue
-		}
-		// タイトルに特定の文字列が含まれているか
-		// if regexp.MustCompile(`.*cover|Cover|歌って|MV.*`).Match([]byte(video.Snippet.Title)) {
-		// 	ytcr = append(ytcr, YouTubeCheckResponse{ID: video.Id, Title: video.Snippet.Title, Schedule: video.LiveStreamingDetails.ScheduledStartTime, TwitterID: yttw[video.Id]})
-
-		// 	log.Info().
-		// 		Str("severity", "INFO").
-		// 		Str("service", "youtube-video-check").
-		// 		Str("id", video.Id).
-		// 		Str("title", video.Snippet.Title).
-		// 		Str("duration", video.ContentDetails.Duration).
-		// 		Str("schedule", scheduledStartTime).
-		// 		Send()
-		// 	continue
-		// }
-		// // 動画概要欄に特定の文字が含まれているか
-		// if !regexp.MustCompile(`.*vocal|Vocal|song|Song|歌|MV|作曲.*`).Match([]byte(video.Snippet.Description)) {
-		// 	continue
-		// }
-		// にじさんじライバーのチャンネルで公開されたか
-		if !NijisanjiCheck(channelIdList, video.Snippet.ChannelId) {
-			continue
-		}
-
-		// フィルターをくくり抜けたデータのみログを表示
-		log.Info().
-			Str("severity", "INFO").
-			Str("service", "twitter-select").
-			Str("twitter_id", yttw[video.Id]).
-			Str("id", video.Id).
-			Str("title", video.Snippet.Title).
-			Str("duration", video.ContentDetails.Duration).
-			Str("schedule", video.LiveStreamingDetails.ScheduledStartTime).
-			Send()
-
-		ytcr = append(ytcr, YouTubeCheckResponse{ID: video.Id, Title: video.Snippet.Title, Schedule: scheduledStartTime, TwitterID: yttw[video.Id]})
-	}
-	return ytcr, nil
-}
-
-// ツイート内容からURLを取得する
-// Youtube動画リンクではない場合は""を返す
-func getUrl(entities ListTweetsEntities) string {
-	if entities.Urls == nil {
-		return ""
-	}
-	for _, url := range entities.Urls {
-		log.Info().Str("severity", "INFO").Str("service", "tweet-getURL").Str("url", url.ExpandedURL).Send()
-		idx := strings.Index(url.ExpandedURL, "youtu.be")
-		if idx != -1 {
-			return url.ExpandedURL[idx+9:idx+20]
-		}
-		// https://www.youtube.com/watch?v=PBf70efxSkI
-		if strings.Contains(url.ExpandedURL, "youtube.com/watch") {
-			return url.ExpandedURL[32:43]
-		}
-	}
-	return ""
+	*/
 }
