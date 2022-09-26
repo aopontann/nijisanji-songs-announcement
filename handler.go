@@ -102,6 +102,13 @@ func TwitterSearchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = tw.Mail(tsr)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
 	ytcr, err := tw.Select(tsr)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
