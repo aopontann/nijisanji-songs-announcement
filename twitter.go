@@ -264,6 +264,10 @@ func (tw *Twitter) Select(tsr []TwitterSearchResponse) ([]TwitterSearchResponse,
 		if regexp.MustCompile(`.*切り抜き.*`).Match([]byte(video.Snippet.Title)) {
 			continue
 		}
+		// タイトルに特定の文字が含まれている場合
+		if regexp.MustCompile(`.*漫画|メン限.*`).Match([]byte(video.Snippet.Title)) {
+			continue
+		}
 		// にじさんじライバーのチャンネルで公開されていない場合
 		if !NijisanjiCheck(channelIdList, video.Snippet.ChannelId) {
 			continue
@@ -328,8 +332,8 @@ func tweetsFilter(ltd []ListTweetsData) []ListTweetsData {
 func (tw *Twitter) Mail(tsr []TwitterSearchResponse) error {
 	clog := log.Error().Str("severity", "ERROR").Str("service", "twitter-mail")
 	for _, t := range tsr {
-		// ツイート内容に"公開"の文字が含まれている場合、メールを送る
-		if strings.Contains(t.Text, "公開") {
+		// ツイート内容に"公開"の文字が含まれているかつ動画リンクがない場合、メールを送る
+		if strings.Contains(t.Text, "公開") && t.YoutubeData == nil {
 			err := sendMail(t.ID, t.Text)
 			if err != nil {
 				clog.Str("id", t.ID).Str("text", t.Text).Msg(err.Error())
@@ -343,6 +347,7 @@ func (tw *Twitter) Mail(tsr []TwitterSearchResponse) error {
 		}
 		// Youtube動画の情報
 		var video = t.YoutubeData
+		// 公開時間が決まっていない動画の場合
 		if video.LiveStreamingDetails == nil {
 			continue
 		}
