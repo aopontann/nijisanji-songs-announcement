@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha1"
@@ -22,10 +21,6 @@ import (
 )
 
 type Twitter struct{}
-
-type PostTweetContext struct {
-	Text string `json:"text"`
-}
 
 type GetTweetContext struct {
 	ID   string `json:"id"`
@@ -93,21 +88,27 @@ type TwitterSearchResponse struct {
 var twlog = log.Info().Str("service", "twitter-search").Str("severity", "ERROR")
 
 // 歌動画の告知ツイート
-func (tw *Twitter) Post(id string, text string) error {
+func (tw *Twitter) Post(v getVideoInfo) error {
 	const endpoint = "https://api.twitter.com/2/tweets"
-	text = fmt.Sprintf("5分後に公開予定\n\n%s\n\nhttps://www.youtube.com/watch?v=%s", text, id)
-	requestBody := &PostTweetContext{
-		Text: text,
+	var requestBody string
+
+	if v.TwitterID != "" {
+		requestBody = fmt.Sprintf(`{
+			"text": "5分後に公開",
+			"quote_tweet_id": "%s"
+		}`, v.TwitterID)
+	} else {
+		requestBody = fmt.Sprintf(`{
+			"text": "5分後に公開予定\n\n%s\n\nhttps://www.youtube.com/watch?v=%s"
+		}`, v.Title, v.ID)
 	}
-	jsonString, err := json.Marshal(requestBody)
-	if err != nil {
-		return err
-	}
+	payload := strings.NewReader(requestBody)
+
 	t := time.Now().Unix()
 
 	// 認証に使うnonceを生成する
 	key := make([]byte, 32)
-	_, err = rand.Read(key)
+	_, err := rand.Read(key)
 	if err != nil {
 		return err
 	}
@@ -133,7 +134,7 @@ func (tw *Twitter) Post(id string, text string) error {
 
 	const oauth1header = `OAuth oauth_consumer_key="%s",oauth_nonce="%s",oauth_signature="%s",oauth_signature_method="%s",oauth_timestamp="%d",oauth_token="%s",oauth_version="%s"`
 
-	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonString))
+	req, err := http.NewRequest("POST", endpoint, payload)
 	if err != nil {
 		return err
 	}
@@ -297,14 +298,15 @@ func getUrl(entities ListTweetsEntities) string {
 	}
 	vid := ""
 	for _, url := range entities.Urls {
-		log.Info().Str("severity", "INFO").Str("service", "tweet-getURL").Str("url", url.ExpandedURL).Str("vid", vid).Send()
+		log.Info().Str("severity", "INFO").Str("service", "tweet-getURL").Str("url", url.ExpandedURL).Send()
 		idx := strings.Index(url.ExpandedURL, "youtu.be")
 		if idx != -1 {
 			vid = url.ExpandedURL[idx+9 : idx+20]
 		}
-		// https://www.youtube.com/watch?v=PBf70efxSkI
-		if strings.Contains(url.ExpandedURL, "youtube.com/watch") {
-			vid = url.ExpandedURL[32:43]
+		// https://youtube.com/watch?v=kqdeA6CxOs0
+		idx = strings.Index(url.ExpandedURL, "youtube.com/watch")
+		if idx != -1 {
+			vid = url.ExpandedURL[idx+20 : idx+31]
 		}
 		if vid != "" {
 			return vid
