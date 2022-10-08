@@ -21,12 +21,15 @@ func main() {
 	// if err != nil {
 	// 	log.Fatal().Err(err).Msg("godotenv.Load() error")
 	// }
-	godotenv.Load()
-
 
 	port := os.Getenv("PORT")
+	log.Debug().Str("severity", "DEBUG").Str("PORT", port).Send()
 	if port == "" {
-		port = "8080"
+		err := godotenv.Load(".env.local")
+		if err != nil {
+			log.Fatal().Err(err).Msg("godotenv.Load() error")
+		}
+		port = os.Getenv("PORT")
 	}
 
 	ctx := context.Background()
@@ -49,7 +52,7 @@ func main() {
 		io.WriteString(w, "error-demo\n")
 	}
 
-	send :=  func(w http.ResponseWriter, _ *http.Request) {
+	send := func(w http.ResponseWriter, _ *http.Request) {
 		sendMail("test", "test2-message")
 		io.WriteString(w, "send-demo\n")
 	}
