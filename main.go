@@ -16,14 +16,9 @@ var YoutubeService *youtube.Service
 
 func main() {
 	var err error
-	// .envの読み込み(開発環境の時のみ読み込むようにしたい)
-	// err = godotenv.Load(".env.local")
-	// if err != nil {
-	// 	log.Fatal().Err(err).Msg("godotenv.Load() error")
-	// }
 
 	port := os.Getenv("PORT")
-	log.Debug().Str("severity", "DEBUG").Str("PORT", port).Send()
+	// log.Debug().Str("severity", "DEBUG").Str("PORT", port).Send()
 	if port == "" {
 		err := godotenv.Load(".env.local")
 		if err != nil {
