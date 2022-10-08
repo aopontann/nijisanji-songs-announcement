@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"regexp"
 
@@ -8,8 +9,9 @@ import (
 )
 
 type getVideoInfo struct {
-	Id    string `json:"id"`
+	ID    string `json:"id"`
 	Title string `json:"title"`
+	TwitterID string `json:"twitter_id"`
 }
 
 // タイトルにこの文字が含まれていると歌動画確定
@@ -81,20 +83,25 @@ func GetVideos(at string, bt string) ([]getVideoInfo, error) {
 	var (
 		id        string
 		title     string
+		tid       sql.NullString
 		videoList []getVideoInfo
 	)
-	rows, err := DB.Query("SELECT id, title FROM videos WHERE songConfirm = 1 AND scheduled_start_time >= ? AND scheduled_start_time <= ?", at, bt)
+	rows, err := DB.Query("SELECT id, title, twitter_id FROM videos WHERE songConfirm = 1 AND scheduled_start_time >= ? AND scheduled_start_time <= ?", at, bt)
 	if err != nil {
 		log.Error().Str("severity", "ERROR").Err(err).Msg("select videos failed")
 		return []getVideoInfo{}, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		err := rows.Scan(&id, &title)
+		err := rows.Scan(&id, &title, &tid)
 		if err != nil {
 			return []getVideoInfo{}, err
 		}
-		videoList = append(videoList, getVideoInfo{Id: id, Title: title})
+		if tid.Valid {
+			videoList = append(videoList, getVideoInfo{ID: id, Title: title, TwitterID: tid.String})
+		} else {
+			videoList = append(videoList, getVideoInfo{ID: id, Title: title, TwitterID: ""})
+		}
 	}
 	err = rows.Err()
 	if err != nil {
