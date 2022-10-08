@@ -297,14 +297,15 @@ func getUrl(entities ListTweetsEntities) string {
 	}
 	vid := ""
 	for _, url := range entities.Urls {
-		log.Info().Str("severity", "INFO").Str("service", "tweet-getURL").Str("url", url.ExpandedURL).Str("vid", vid).Send()
+		log.Info().Str("severity", "INFO").Str("service", "tweet-getURL").Str("url", url.ExpandedURL).Send()
 		idx := strings.Index(url.ExpandedURL, "youtu.be")
 		if idx != -1 {
 			vid = url.ExpandedURL[idx+9 : idx+20]
 		}
-		// https://www.youtube.com/watch?v=PBf70efxSkI
-		if strings.Contains(url.ExpandedURL, "youtube.com/watch") {
-			vid = url.ExpandedURL[32:43]
+		// https://youtube.com/watch?v=kqdeA6CxOs0
+		idx = strings.Index(url.ExpandedURL, "youtube.com/watch")
+		if idx != -1 {
+			vid = url.ExpandedURL[idx+20:idx+31]
 		}
 		if vid != "" {
 			return vid
