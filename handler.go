@@ -69,7 +69,7 @@ func TwitterHandler(w http.ResponseWriter, r *http.Request) {
 
 	for _, video := range videoList {
 		// changed, err := yt.CheckVideo(video.Id)
-		log.Info().Str("severity", "INFO").Str("service", "tweet").Str("id", video.Id).Str("title", video.Title).Send()
+		log.Info().Str("severity", "INFO").Str("service", "tweet").Str("id", video.ID).Str("title", video.Title).Send()
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
@@ -78,7 +78,7 @@ func TwitterHandler(w http.ResponseWriter, r *http.Request) {
 		// if changed {
 		// 	continue
 		// }
-		err = tw.Post(video.Id, video.Title)
+		err = tw.Post(video)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
