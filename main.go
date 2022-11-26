@@ -48,7 +48,7 @@ func main() {
 	}
 
 	send := func(w http.ResponseWriter, _ *http.Request) {
-		sendMail("test", "test2-message")
+		sendMail("id001", "test-subject", "test2-message")
 		io.WriteString(w, "send-demo\n")
 	}
 

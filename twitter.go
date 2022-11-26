@@ -334,9 +334,9 @@ func tweetsFilter(ltd []ListTweetsData) []ListTweetsData {
 func (tw *Twitter) Mail(tsr []TwitterSearchResponse) error {
 	clog := log.Error().Str("severity", "ERROR").Str("service", "twitter-mail")
 	for _, t := range tsr {
-		// ツイート内容に"公開"の文字が含まれているかつ動画リンクがない場合、メールを送る
-		if strings.Contains(t.Text, "公開") && t.YoutubeData == nil {
-			err := sendMail(t.ID, t.Text)
+		// ツイート内容に"プレミア公開"の文字が含まれているかつ動画リンクがない場合、メールを送る
+		if strings.Contains(t.Text, "プレミア公開") && t.YoutubeData == nil {
+			err := sendMail(t.ID, "動画リンクない告知", t.Text)
 			if err != nil {
 				clog.Str("id", t.ID).Str("text", t.Text).Msg(err.Error())
 				return err
@@ -363,7 +363,7 @@ func (tw *Twitter) Mail(tsr []TwitterSearchResponse) error {
 			continue
 		}
 		// ツイートIDとツイート内容をメールの送信
-		err := sendMail(t.ID, t.Text)
+		err := sendMail(t.ID, "動画リンクあり告知", t.Text)
 		if err != nil {
 			clog.Str("id", t.ID).Str("text", t.Text).Msg(err.Error())
 			return err
