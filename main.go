@@ -12,7 +12,7 @@ func main() {
 	port := os.Getenv("PORT")
 	log.Debug().Str("severity", "DEBUG").Str("PORT", port).Send()
 	if port == "" {
-		port = "8000"
+		port = "8080"
 	}
 
 	// YouTube Data API 初期化
@@ -41,6 +41,7 @@ func main() {
 	http.HandleFunc("/error", h2)
 	http.HandleFunc("/mail", send)
 	http.HandleFunc("/youtube", YoutubeHandler)
+	http.HandleFunc("/youtube/activities", YouTubeActivitiesHandler)
 	http.HandleFunc("/twitter", TwitterHandler)
 
 	// log.Debug().Msgf("listening on port %s", port)
