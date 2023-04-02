@@ -9,7 +9,6 @@ import (
 )
 
 var tw = Twitter{}
-var yt = Youtube{}
 
 func YoutubeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -18,28 +17,28 @@ func YoutubeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vid, err := yt.Search()
+	vid, err := Search()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 
-	yvr, err := yt.Video(vid)
+	yvr, err := vid.Video()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 
-	ysr, err := yt.Select(yvr)
+	ysr, err := yvr.Select()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 
-	err = yt.Save(ysr)
+	err = ysr.Save()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
