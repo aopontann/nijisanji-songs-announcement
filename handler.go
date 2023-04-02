@@ -48,6 +48,44 @@ func YoutubeHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Youtube OK"))
 }
 
+func YouTubeActivitiesHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed) // 405
+		w.Write([]byte("POSTだけだよ"))
+		return
+	}
+
+	vid, err := Activities()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	yvr, err := vid.Video()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	ysr, err := yvr.Select()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	err = ysr.Save()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	w.Write([]byte("Youtube Activities OK"))
+}
+
 func TwitterHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
