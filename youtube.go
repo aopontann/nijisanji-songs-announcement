@@ -98,7 +98,7 @@ func Search() (VideoIDList, error) {
 // Youtube Data API から動画情報を取得
 func (list VideoIDList) Video() (YTVRList, error) {
 	var yvs []YouTubeVideoResponse
-	for i := 0; i*50 <= len(list); i++ { 
+	for i := 0; i*50 <= len(list); i++ {
 		var id string
 		if len(list) > 50*(i+1) {
 			id = strings.Join(list[50*i:50*(i+1)], ",")
@@ -256,4 +256,51 @@ func (yt *Youtube) CheckVideo(vid string) (bool, error) {
 	}
 	// DBに保存されている動画情報がAPIから取得したデータと同じ場合
 	return false, nil
+}
+
+func Activities() (VideoIDList, error) {
+	// 動画検索範囲
+	dtAfter := time.Now().UTC().Add(-120 * time.Minute).Format("2006-01-02T15:04:00Z")
+	dtBefore := time.Now().UTC().Format("2006-01-02T15:04:00Z")
+	// 動画IDを格納する文字列型配列を宣言
+	vid := make([]string, 0, 600)
+
+	// にじさんじライバーのチャンネルリストを取得
+	channelIdList, err := GetChannelIdList()
+	if err != nil {
+		return nil, err
+	}
+
+	pt := ""
+	for _, cid := range channelIdList {
+		for {
+			call := YouTubeService.Activities.List([]string{"snippet", "contentDetails"}).ChannelId(cid).MaxResults(50).PublishedAfter(dtAfter).PublishedBefore(dtBefore).PageToken(pt)
+			res, err := call.Do()
+			if err != nil {
+				log.Error().Str("severity", "ERROR").Err(err).Msg("activities-list call error")
+				return []string{}, err
+			}
+
+			for _, item := range res.Items {
+				if item.Snippet.Type != "upload" {
+					continue
+				}
+				vid = append(vid, item.ContentDetails.Upload.VideoId)
+			}
+
+			log.Info().
+				Str("severity", "INFO").
+				Str("service", "youtube-activities-list").
+				Str("published", fmt.Sprintf("%s ~ %s", dtAfter, dtBefore)).
+				Str("ChannelId", cid).
+				Str("pageInfo", fmt.Sprintf("perPage=%d total=%d nextPage=%s\n", res.PageInfo.ResultsPerPage, res.PageInfo.TotalResults, res.NextPageToken)).
+				Send()
+
+			if res.NextPageToken == "" {
+				break
+			}
+			pt = res.NextPageToken
+		}
+	}
+	return vid, nil
 }
