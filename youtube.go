@@ -1,18 +1,21 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"google.golang.org/api/option"
 	"google.golang.org/api/youtube/v3"
 )
 
 type Youtube struct{}
 
-type YoutubeVideoResponse struct {
+type YouTubeVideoResponse struct {
 	ID          string `json:"id"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
@@ -21,7 +24,7 @@ type YoutubeVideoResponse struct {
 	ChannelID   string `json:"channel_id"`
 }
 
-type YoutubeSelectResponse struct {
+type YouTubeSelectResponse struct {
 	ID          string `json:"id"`
 	Title       string `json:"title"`
 	Schedule    string `json:"schedule"`
@@ -35,8 +38,24 @@ type YouTubeCheckResponse struct {
 	TwitterID string `json:"twitter_id"`
 }
 
+type VideoIDList []string
+type YTVRList []YouTubeVideoResponse
+type YTSRList []YouTubeSelectResponse
+
+var YouTubeService *youtube.Service
+
+// Youtube Data API の 初期化処理
+func YTNew() {
+	var err error
+	ctx := context.Background()
+	YouTubeService, err = youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
+	if err != nil {
+		log.Fatal().Err(err).Msg("youtube.NewService create failed")
+	}
+}
+
 // Youtube Data API Search List を叩いて検索結果の動画IDを取得
-func (yt *Youtube) Search() ([]string, error) {
+func Search() (VideoIDList, error) {
 	// 動画検索範囲
 	dtAfter := time.Now().UTC().Add(-120 * time.Minute).Format("2006-01-02T15:04:00Z")
 	dtBefore := time.Now().UTC().Add(-60 * time.Minute).Format("2006-01-02T15:04:00Z")
@@ -47,7 +66,7 @@ func (yt *Youtube) Search() ([]string, error) {
 		pt := ""
 		for {
 			// youtube data api search list にリクエストを送る
-			call := YoutubeService.Search.List([]string{"id"}).MaxResults(50).Q(q).PublishedAfter(dtAfter).PublishedBefore(dtBefore).PageToken(pt)
+			call := YouTubeService.Search.List([]string{"id"}).MaxResults(50).Q(q).PublishedAfter(dtAfter).PublishedBefore(dtBefore).PageToken(pt)
 			res, err := call.Do()
 			if err != nil {
 				log.Error().Str("severity", "ERROR").Err(err).Msg("search-list call error")
@@ -77,20 +96,20 @@ func (yt *Youtube) Search() ([]string, error) {
 }
 
 // Youtube Data API から動画情報を取得
-func (yt *Youtube) Video(vid []string) ([]YoutubeVideoResponse, error) {
-	var yvs []YoutubeVideoResponse
-	for i := 0; i*50 <= len(vid); i++ {
+func (list VideoIDList) Video() (YTVRList, error) {
+	var yvs []YouTubeVideoResponse
+	for i := 0; i*50 <= len(list); i++ { 
 		var id string
-		if len(vid) > 50*(i+1) {
-			id = strings.Join(vid[50*i:50*(i+1)], ",")
+		if len(list) > 50*(i+1) {
+			id = strings.Join(list[50*i:50*(i+1)], ",")
 		} else {
-			id = strings.Join(vid[50*i:], ",")
+			id = strings.Join(list[50*i:], ",")
 		}
-		call := YoutubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(id).MaxResults(50)
+		call := YouTubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(id).MaxResults(50)
 		res, err := call.Do()
 		if err != nil {
 			log.Error().Str("severity", "ERROR").Err(err).Msg("videos-list call error")
-			return []YoutubeVideoResponse{}, err
+			return []YouTubeVideoResponse{}, err
 		}
 
 		for _, video := range res.Items {
@@ -101,7 +120,7 @@ func (yt *Youtube) Video(vid []string) ([]YoutubeVideoResponse, error) {
 				scheduledStartTime = strings.Replace(rep1, "Z", "", 1)
 			}
 
-			yvs = append(yvs, YoutubeVideoResponse{ID: video.Id, Title: video.Snippet.Title, Description: video.Snippet.Description, Schedule: scheduledStartTime, Duration: video.ContentDetails.Duration, ChannelID: video.Snippet.ChannelId})
+			yvs = append(yvs, YouTubeVideoResponse{ID: video.Id, Title: video.Snippet.Title, Description: video.Snippet.Description, Schedule: scheduledStartTime, Duration: video.ContentDetails.Duration, ChannelID: video.Snippet.ChannelId})
 
 			log.Info().
 				Str("severity", "INFO").
@@ -117,37 +136,16 @@ func (yt *Youtube) Video(vid []string) ([]YoutubeVideoResponse, error) {
 	return yvs, nil
 }
 
-// Youtube Data API から動画情報を取得
-func (yt *Youtube) Video2(vid []string) ([]*youtube.Video, error) {
-	var yvs []*youtube.Video
-	for i := 0; i*50 <= len(vid); i++ {
-		var id string
-		if len(vid) > 50*(i+1) {
-			id = strings.Join(vid[50*i:50*(i+1)], ",")
-		} else {
-			id = strings.Join(vid[50*i:], ",")
-		}
-		call := YoutubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(id).MaxResults(50)
-		res, err := call.Do()
-		if err != nil {
-			log.Error().Str("severity", "ERROR").Err(err).Msg("videos-list call error")
-			return []*youtube.Video{}, err
-		}
-		yvs = append(yvs, res.Items...)
-	}
-	return yvs, nil
-}
-
 // 歌ってみた動画かフィルターをかける処理
-func (yt *Youtube) Select(yvs []YoutubeVideoResponse) ([]YoutubeSelectResponse, error) {
-	var ysr []YoutubeSelectResponse
+func (list YTVRList) Select() (YTSRList, error) {
+	var ysr []YouTubeSelectResponse
 	// にじさんじライバーのチャンネルリストを取得
 	channelIdList, err := GetChannelIdList()
 	if err != nil {
 		return nil, err
 	}
 	// 歌動画か判断する
-	for _, video := range yvs {
+	for _, video := range list {
 		// プレミア公開する動画か
 		if video.Schedule == "" {
 			continue
@@ -169,11 +167,11 @@ func (yt *Youtube) Select(yvs []YoutubeVideoResponse) ([]YoutubeSelectResponse, 
 			continue
 		}
 
-		ysr = append(ysr, YoutubeSelectResponse{ID: video.ID, Title: video.Title, Schedule: video.Schedule, SongConfirm: checkRes})
+		ysr = append(ysr, YouTubeSelectResponse{ID: video.ID, Title: video.Title, Schedule: video.Schedule, SongConfirm: checkRes})
 
 		log.Info().
 			Str("severity", "INFO").
-			Str("service", "youtube-video-list").
+			Str("service", "youtube-video-select").
 			Str("id", video.ID).
 			Str("title", video.Title).
 			Str("duration", video.Duration).
@@ -184,7 +182,7 @@ func (yt *Youtube) Select(yvs []YoutubeVideoResponse) ([]YoutubeSelectResponse, 
 }
 
 // 動画情報をDBに保存
-func (yt *Youtube) Save(ysr []YoutubeSelectResponse) error {
+func (list YTSRList) Save() error {
 	tx, err := DB.Begin()
 	if err != nil {
 		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Begin error")
@@ -197,7 +195,7 @@ func (yt *Youtube) Save(ysr []YoutubeSelectResponse) error {
 		return err
 	}
 
-	for _, video := range ysr {
+	for _, video := range list {
 		// DBに動画情報を保存
 		_, err := stmt.Exec(video.ID, video.Title, video.SongConfirm, video.Schedule)
 		if err != nil {
@@ -225,7 +223,7 @@ func (yt *Youtube) CheckVideo(vid string) (bool, error) {
 	// エラー表示に使うカスタムログの設定
 	clog := log.Error().Str("severity", "ERROR").Str("service", "youtube-check-video")
 	// Youtube Data API にリクエスト送信して動画情報を取得
-	call := YoutubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(vid).MaxResults(1)
+	call := YouTubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(vid).MaxResults(1)
 	res, err := call.Do()
 	if err != nil {
 		clog.Err(err).Msg("videos-list call error")
