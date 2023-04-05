@@ -86,6 +86,22 @@ func YouTubeActivitiesHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Youtube Activities OK"))
 }
 
+func YouTubeChannelsHandler(w http.ResponseWriter, r *http.Request) {
+	chList, err := Channels()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	err = chList.Save()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	w.Write([]byte("Youtube Channels OK"))
+}
+
 func TwitterHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
