@@ -38,9 +38,15 @@ type YouTubeCheckResponse struct {
 	TwitterID string `json:"twitter_id"`
 }
 
+type YouTubeChannelsResponse struct {
+	ID         string `json:"id"`
+	VideoCount uint64 `json:"video_count"`
+}
+
 type VideoIDList []string
 type YTVRList []YouTubeVideoResponse
 type YTSRList []YouTubeSelectResponse
+type YTCRList []YouTubeChannelsResponse
 
 var YouTubeService *youtube.Service
 
@@ -295,4 +301,92 @@ func Activities() (VideoIDList, error) {
 			Send()
 	}
 	return vid, nil
+}
+
+// チャンネルIDとチャンネルにアップロードされた動画の数を取得
+func Channels() (YTCRList, error) {
+	var cResList []YouTubeChannelsResponse
+	// にじさんじライバーのチャンネルリストを取得
+	cList, err := GetChannelIdList()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 0; i*50 <= len(cList); i++ {
+		var id string
+		if len(cList) > 50*(i+1) {
+			id = strings.Join(cList[50*i:50*(i+1)], ",")
+		} else {
+			id = strings.Join(cList[50*i:], ",")
+		}
+		call := YouTubeService.Channels.List([]string{"statistics"}).MaxResults(50).Id(id)
+		res, err := call.Do()
+		if err != nil {
+			log.Error().Str("severity", "ERROR").Err(err).Msg("channels-list call error")
+			return []YouTubeChannelsResponse{}, err
+		}
+
+		for _, item := range res.Items {
+			cResList = append(cResList, YouTubeChannelsResponse{ID: item.Id, VideoCount: item.Statistics.VideoCount})
+		}
+	}
+	return cResList, nil
+}
+
+// DBに保存されているアップロードされた動画の数と、APIから取得した数と比較し、新しく動画がアップロードされたチャンネルのIDを返す
+func (clist YTCRList) Select() ([]string, error) {
+	// 新しく動画をアップロードしたチャンネルIDを格納する変数
+	var diffCList []string
+	// DBに保存されているチャンネルIDとそのチャンネルの動画本数の一覧を取得
+	vvcList, err := GetVideoCountList()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, list := range clist {
+		if vvcList[list.ID] != list.VideoCount {
+			diffCList = append(diffCList, list.ID)
+		}
+	}
+	return diffCList, nil
+}
+
+func (clist YTCRList) Save() error {
+	tx, err := DB.Begin()
+	if err != nil {
+		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Begin error")
+		return err
+	}
+	// DB準備
+	stmt, err := tx.Prepare("UPDATE vtubers SET video_count = ? WHERE id = ? AND video_count != ?")
+	if err != nil {
+		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Prepare error")
+		return err
+	}
+
+	for _, list := range clist {
+		// DBに動画情報を保存
+		_, err := stmt.Exec(list.VideoCount, list.ID, list.VideoCount)
+		if err != nil {
+			log.Error().Str("severity", "ERROR").Err(err).Msg("Save video_count failed")
+			if tx.Rollback() != nil {
+				log.Error().Str("severity", "ERROR").Err(err).Msg("Rollback error")
+			}
+			return err
+		}
+		log.Info().
+			Str("severity", "INFO").
+			Str("service", "youtube-channels-save").
+			Str("channelId", list.ID).
+			Uint64("videoCount", list.VideoCount).
+			Send()
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Error().Str("severity", "ERROR").Err(err).Msg("tx.Commit error")
+		return err
+	}
+
+	return nil
 }
