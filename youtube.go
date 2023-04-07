@@ -367,12 +367,6 @@ func (clist YTCRList) Save() error {
 			}
 			return err
 		}
-		log.Info().
-			Str("severity", "INFO").
-			Str("service", "youtube-channels-save").
-			Str("channelId", list.ID).
-			Uint64("videoCount", list.VideoCount).
-			Send()
 	}
 
 	err = tx.Commit()
@@ -397,6 +391,13 @@ func (newlist YTCRList) CheckUpload() (NewUpChList, error) {
 	for _, newCh := range newlist {
 		// DBに保存されている動画の本数より、新しく取得した動画の本数が多い場合　動画が削除されて数が減っている場合は返さない
 		if vvcList[newCh.ID] < newCh.VideoCount {
+			log.Info().
+				Str("severity", "INFO").
+				Str("service", "youtube-check-upload").
+				Str("ChannelId", newCh.ID).
+				Uint64("NewVideoCount", newCh.VideoCount).
+				Uint64("OldVideoCount", vvcList[newCh.ID]).
+				Send()
 			diffCList = append(diffCList, NewUploadChannelList{ID: newCh.ID, NewVideoCount: newCh.VideoCount, OldVideoCount: vvcList[newCh.ID]})
 		}
 	}
@@ -435,4 +436,3 @@ func (list NewUpChList) Search() (VideoIDList, error) {
 	}
 	return vid, nil
 }
-
