@@ -1,4 +1,8 @@
 # nijisanji-songs-announcement
+ホットリロードツールのインストール
+```
+go install github.com/cosmtrek/air@latest
+```
 - どんなことに挑戦したか（アプリケーションの特徴）
 - アプリケーションのURL
 - どんなアプリケーションかわかるように、gifや画像を貼る
