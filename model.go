@@ -85,8 +85,8 @@ func GetVideoCountList() (VtuberVideoCountResponse, error) {
 	var (
 		channelId string
 		VideoCount uint64
-		vvcList   VtuberVideoCountResponse
 	)
+	vvcList := VtuberVideoCountResponse{}
 	rows, err := DB.Query("select id, view_count from vtubers")
 	if err != nil {
 		log.Error().Str("severity", "ERROR").Err(err).Msg("select vtuber failed")
