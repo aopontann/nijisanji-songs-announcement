@@ -43,10 +43,21 @@ type YouTubeChannelsResponse struct {
 	VideoCount uint64 `json:"video_count"`
 }
 
+type NewUploadChannelList struct {
+	ID            string `json:"id"`
+	NewVideoCount uint64 `json:"new_video_count"`
+	OldVideoCount uint64 `json:"old_video_count"`
+}
+
 type VideoIDList []string
 type YTVRList []YouTubeVideoResponse
 type YTSRList []YouTubeSelectResponse
+
+// チャンネルIDと最新の動画数を格納する配列の型
 type YTCRList []YouTubeChannelsResponse
+
+// 新しく動画をアップロードしたチャンネルIDと古い動画と新しい動画の数を格納する配列の型
+type NewUpChList []NewUploadChannelList
 
 var YouTubeService *youtube.Service
 
@@ -333,31 +344,14 @@ func Channels() (YTCRList, error) {
 	return cResList, nil
 }
 
-// DBに保存されているアップロードされた動画の数と、APIから取得した数と比較し、新しく動画がアップロードされたチャンネルのIDを返す
-func (clist YTCRList) Select() ([]string, error) {
-	// 新しく動画をアップロードしたチャンネルIDを格納する変数
-	var diffCList []string
-	// DBに保存されているチャンネルIDとそのチャンネルの動画本数の一覧を取得
-	vvcList, err := GetVideoCountList()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, list := range clist {
-		if vvcList[list.ID] != list.VideoCount {
-			diffCList = append(diffCList, list.ID)
-		}
-	}
-	return diffCList, nil
-}
-
+// 新しく取得したチャンネルの動画数をDBに保存
 func (clist YTCRList) Save() error {
 	tx, err := DB.Begin()
 	if err != nil {
 		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Begin error")
 		return err
 	}
-	// DB準備
+	// 動画が削除されて動画数が減っていても、上書きする
 	stmt, err := tx.Prepare("UPDATE vtubers SET video_count = ? WHERE id = ? AND video_count != ?")
 	if err != nil {
 		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Prepare error")
@@ -365,7 +359,6 @@ func (clist YTCRList) Save() error {
 	}
 
 	for _, list := range clist {
-		// DBに動画情報を保存
 		_, err := stmt.Exec(list.VideoCount, list.ID, list.VideoCount)
 		if err != nil {
 			log.Error().Str("severity", "ERROR").Err(err).Msg("Save video_count failed")
@@ -390,3 +383,56 @@ func (clist YTCRList) Save() error {
 
 	return nil
 }
+
+// 新しく動画をアップロードしたチャンネルIDと古い動画数と新しい動画の数を返す
+func (newlist YTCRList) CheckUpload() (NewUpChList, error) {
+	// 新しく動画をアップロードしたチャンネルIDを格納する変数
+	var diffCList NewUpChList
+	// DBに保存されているチャンネルIDとそのチャンネルの動画本数の一覧を取得 map[string] uint64
+	vvcList, err := GetVideoCountList()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, newCh := range newlist {
+		// DBに保存されている動画の本数より、新しく取得した動画の本数が多い場合　動画が削除されて数が減っている場合は返さない
+		if vvcList[newCh.ID] < newCh.VideoCount {
+			diffCList = append(diffCList, NewUploadChannelList{ID: newCh.ID, NewVideoCount: newCh.VideoCount, OldVideoCount: vvcList[newCh.ID]})
+		}
+	}
+	return diffCList, nil
+}
+
+// 新しくアップロードされた動画のIDを取得
+func (list NewUpChList) Search() (VideoIDList, error) {
+	// 動画IDを格納する文字列型配列を宣言
+	vid := make([]string, 0, 600)
+
+	for _, ch := range list {
+		// 取得した動画IDをログに出力するための変数
+		var rid []string
+		call := YouTubeService.Search.List([]string{"snippet"}).ChannelId(ch.ID).MaxResults(int64(ch.NewVideoCount - ch.OldVideoCount)).Order("date")
+		res, err := call.Do()
+		if err != nil {
+			log.Error().Str("severity", "ERROR").Err(err).Msg("search-list call error")
+			return []string{}, err
+		}
+
+		for _, item := range res.Items {
+			if item.Id.Kind != "youtube#video" {
+				continue
+			}
+			rid = append(rid, item.Id.VideoId)
+			vid = append(vid, item.Id.VideoId)
+		}
+
+		log.Info().
+			Str("severity", "INFO").
+			Str("service", "youtube-search-list").
+			Str("ChannelId", ch.ID).
+			Strs("videoId", rid).
+			Send()
+	}
+	return vid, nil
+}
+
