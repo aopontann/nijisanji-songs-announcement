@@ -86,7 +86,7 @@ func YouTubeActivitiesHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Youtube Activities OK"))
 }
 
-func YouTubeChannelsHandler(w http.ResponseWriter, r *http.Request) {
+func UpdateVideoCountHandler(w http.ResponseWriter, r *http.Request) {
 	chList, err := Channels()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -100,6 +100,58 @@ func YouTubeChannelsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write([]byte("Youtube Channels OK"))
+}
+
+func CheckNewUploadHandler(w http.ResponseWriter, r *http.Request) {
+	chList, err := Channels()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	newVideoList, err := chList.CheckUpload()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	vid, err := newVideoList.Search()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	yvr, err := vid.Video()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	ysr, err := yvr.Select()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	err = ysr.Save()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	err = chList.Save()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	w.Write([]byte("checkNewUpload OK"))
 }
 
 func TwitterHandler(w http.ResponseWriter, r *http.Request) {
