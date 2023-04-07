@@ -42,7 +42,8 @@ func main() {
 	http.HandleFunc("/mail", send)
 	http.HandleFunc("/youtube", YoutubeHandler)
 	http.HandleFunc("/youtube/activities", YouTubeActivitiesHandler)
-	http.HandleFunc("/youtube/channels", YouTubeChannelsHandler)
+	http.HandleFunc("/youtube/updateVideoCount", UpdateVideoCountHandler)
+	http.HandleFunc("/youtube/checkNewVideo", CheckNewUploadHandler)
 	http.HandleFunc("/twitter", TwitterHandler)
 
 	// log.Debug().Msgf("listening on port %s", port)
