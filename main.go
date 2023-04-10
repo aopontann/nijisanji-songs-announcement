@@ -1,37 +1,22 @@
 package main
 
 import (
-	"context"
 	"io"
 	"net/http"
 	"os"
 
-	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
-	"google.golang.org/api/option"
-	"google.golang.org/api/youtube/v3"
 )
 
-var YoutubeService *youtube.Service
-
 func main() {
-	var err error
-
 	port := os.Getenv("PORT")
-	// log.Debug().Str("severity", "DEBUG").Str("PORT", port).Send()
+	log.Debug().Str("severity", "DEBUG").Str("PORT", port).Send()
 	if port == "" {
-		err := godotenv.Load(".env.local")
-		if err != nil {
-			log.Fatal().Err(err).Msg("godotenv.Load() error")
-		}
-		port = os.Getenv("PORT")
+		port = "8080"
 	}
 
-	ctx := context.Background()
-	YoutubeService, err = youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
-	if err != nil {
-		log.Fatal().Err(err).Msg("youtube.NewService create failed")
-	}
+	// YouTube Data API 初期化
+	YTNew()
 
 	// DB接続初期化
 	DBInit()
@@ -48,7 +33,7 @@ func main() {
 	}
 
 	send := func(w http.ResponseWriter, _ *http.Request) {
-		sendMail("id001", "test-subject", "test2-message")
+		SendMail("test-subject", "test2-message")
 		io.WriteString(w, "send-demo\n")
 	}
 
@@ -56,8 +41,9 @@ func main() {
 	http.HandleFunc("/error", h2)
 	http.HandleFunc("/mail", send)
 	http.HandleFunc("/youtube", YoutubeHandler)
+	http.HandleFunc("/youtube/updateVideoCount", UpdateVideoCountHandler)
+	http.HandleFunc("/youtube/checkNewVideo", CheckNewUploadHandler)
 	http.HandleFunc("/twitter", TwitterHandler)
-	http.HandleFunc("/twitter/search", TwitterSearchHandler)
 
 	// log.Debug().Msgf("listening on port %s", port)
 

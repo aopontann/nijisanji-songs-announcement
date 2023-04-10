@@ -9,7 +9,6 @@ import (
 )
 
 var tw = Twitter{}
-var yt = Youtube{}
 
 func YoutubeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -18,28 +17,28 @@ func YoutubeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vid, err := yt.Search()
+	vid, err := Search()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 
-	yvr, err := yt.Video(vid)
+	yvr, err := vid.Video()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 
-	ysr, err := yt.Select(yvr)
+	ysr, err := yvr.Select()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 
-	err = yt.Save(ysr)
+	err = ysr.Save()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
@@ -47,6 +46,83 @@ func YoutubeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte("Youtube OK"))
+}
+
+func UpdateVideoCountHandler(w http.ResponseWriter, r *http.Request) {
+	chList, err := Channels()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	err = chList.Save()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	w.Write([]byte("Youtube Channels OK"))
+}
+
+func CheckNewUploadHandler(w http.ResponseWriter, r *http.Request) {
+	chList, err := Channels()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	newVideoList, err := chList.CheckUpload()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	vid, err := newVideoList.GetNewVideoId()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	yvr, err := vid.Video()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	ysr, err := yvr.Select()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	for _, v := range ysr {
+		err := SendMail("新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID))
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+			return
+		}
+	}
+
+	err = ysr.Save()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	err = chList.Save()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	w.Write([]byte("checkNewUpload OK"))
 }
 
 func TwitterHandler(w http.ResponseWriter, r *http.Request) {
@@ -85,43 +161,5 @@ func TwitterHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	w.Write([]byte("Twitter OK"))
-}
-
-func TwitterSearchHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		w.Write([]byte("POSTだけだよ"))
-		return
-	}
-
-	tsr, err := tw.Search()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	err = tw.Mail(tsr)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	ytcr, err := tw.Select(tsr)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	err = DBSave(ytcr)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
 	w.Write([]byte("Twitter OK"))
 }

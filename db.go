@@ -22,35 +22,3 @@ func DBInit() {
 		log.Fatal().Err(err).Msg("db ping failed")
 	}
 }
-
-func DBSave(ytcr []TwitterSearchResponse) error {
-	tx, err := DB.Begin()
-	if err != nil {
-		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Begin error")
-		return err
-	}
-	stmt, err := tx.Prepare("INSERT IGNORE INTO videos(id, title, songConfirm, scheduled_start_time, twitter_id) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE twitter_id = if(twitter_id = NULL, twitter_id, VALUES(twitter_id))")
-	if err != nil {
-		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Prepare error")
-		return err
-	}
-
-	for _, v := range ytcr {
-		// v.TwitterID が二つある理由は
-		// 既にレコードが存在している場合INSERTをスキップするが、twitter_id を上書きしたい時があるため、
-		// VALUES とON DUPLICATE KEY UPDATE の二箇所で twitter_id を指定しているため
-		_, err := stmt.Exec(v.YoutubeData.Id, v.YoutubeData.Snippet.Title, true, v.YoutubeData.LiveStreamingDetails.ScheduledStartTime, v.ID)
-		if err != nil {
-			log.Error().Str("severity", "ERROR").Err(err).Msg("Save videos failed")
-			tx.Rollback()
-			return err
-		}
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Commit error")
-		return err
-	}
-	return nil
-}

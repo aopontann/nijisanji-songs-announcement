@@ -1,18 +1,21 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"google.golang.org/api/option"
 	"google.golang.org/api/youtube/v3"
 )
 
 type Youtube struct{}
 
-type YoutubeVideoResponse struct {
+type YouTubeVideoResponse struct {
 	ID          string `json:"id"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
@@ -21,7 +24,7 @@ type YoutubeVideoResponse struct {
 	ChannelID   string `json:"channel_id"`
 }
 
-type YoutubeSelectResponse struct {
+type YouTubeSelectResponse struct {
 	ID          string `json:"id"`
 	Title       string `json:"title"`
 	Schedule    string `json:"schedule"`
@@ -35,8 +38,43 @@ type YouTubeCheckResponse struct {
 	TwitterID string `json:"twitter_id"`
 }
 
+type YouTubeChannelsResponse struct {
+	ID         string `json:"id"`
+	VideoCount uint64 `json:"video_count"`
+	PlaylistID string `json:"playlist_id"`
+}
+
+type NewUploadChannelList struct {
+	ID            string `json:"id"`
+	NewVideoCount uint64 `json:"new_video_count"`
+	OldVideoCount uint64 `json:"old_video_count"`
+	PlaylistID string `json:"playlist_id"`
+}
+
+type VideoIDList []string
+type YTVRList []YouTubeVideoResponse
+type YTSRList []YouTubeSelectResponse
+
+// チャンネルIDと最新の動画数を格納する配列の型
+type YTCRList []YouTubeChannelsResponse
+
+// 新しく動画をアップロードしたチャンネルIDと古い動画と新しい動画の数を格納する配列の型
+type NewUpChList []NewUploadChannelList
+
+var YouTubeService *youtube.Service
+
+// Youtube Data API の 初期化処理
+func YTNew() {
+	var err error
+	ctx := context.Background()
+	YouTubeService, err = youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
+	if err != nil {
+		log.Fatal().Err(err).Msg("youtube.NewService create failed")
+	}
+}
+
 // Youtube Data API Search List を叩いて検索結果の動画IDを取得
-func (yt *Youtube) Search() ([]string, error) {
+func Search() (VideoIDList, error) {
 	// 動画検索範囲
 	dtAfter := time.Now().UTC().Add(-120 * time.Minute).Format("2006-01-02T15:04:00Z")
 	dtBefore := time.Now().UTC().Add(-60 * time.Minute).Format("2006-01-02T15:04:00Z")
@@ -47,7 +85,7 @@ func (yt *Youtube) Search() ([]string, error) {
 		pt := ""
 		for {
 			// youtube data api search list にリクエストを送る
-			call := YoutubeService.Search.List([]string{"id"}).MaxResults(50).Q(q).PublishedAfter(dtAfter).PublishedBefore(dtBefore).PageToken(pt)
+			call := YouTubeService.Search.List([]string{"id"}).MaxResults(50).Q(q).PublishedAfter(dtAfter).PublishedBefore(dtBefore).PageToken(pt)
 			res, err := call.Do()
 			if err != nil {
 				log.Error().Str("severity", "ERROR").Err(err).Msg("search-list call error")
@@ -77,20 +115,20 @@ func (yt *Youtube) Search() ([]string, error) {
 }
 
 // Youtube Data API から動画情報を取得
-func (yt *Youtube) Video(vid []string) ([]YoutubeVideoResponse, error) {
-	var yvs []YoutubeVideoResponse
-	for i := 0; i*50 <= len(vid); i++ {
+func (list VideoIDList) Video() (YTVRList, error) {
+	var yvs []YouTubeVideoResponse
+	for i := 0; i*50 <= len(list); i++ {
 		var id string
-		if len(vid) > 50*(i+1) {
-			id = strings.Join(vid[50*i:50*(i+1)], ",")
+		if len(list) > 50*(i+1) {
+			id = strings.Join(list[50*i:50*(i+1)], ",")
 		} else {
-			id = strings.Join(vid[50*i:], ",")
+			id = strings.Join(list[50*i:], ",")
 		}
-		call := YoutubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(id).MaxResults(50)
+		call := YouTubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(id).MaxResults(50)
 		res, err := call.Do()
 		if err != nil {
 			log.Error().Str("severity", "ERROR").Err(err).Msg("videos-list call error")
-			return []YoutubeVideoResponse{}, err
+			return []YouTubeVideoResponse{}, err
 		}
 
 		for _, video := range res.Items {
@@ -101,7 +139,7 @@ func (yt *Youtube) Video(vid []string) ([]YoutubeVideoResponse, error) {
 				scheduledStartTime = strings.Replace(rep1, "Z", "", 1)
 			}
 
-			yvs = append(yvs, YoutubeVideoResponse{ID: video.Id, Title: video.Snippet.Title, Description: video.Snippet.Description, Schedule: scheduledStartTime, Duration: video.ContentDetails.Duration, ChannelID: video.Snippet.ChannelId})
+			yvs = append(yvs, YouTubeVideoResponse{ID: video.Id, Title: video.Snippet.Title, Description: video.Snippet.Description, Schedule: scheduledStartTime, Duration: video.ContentDetails.Duration, ChannelID: video.Snippet.ChannelId})
 
 			log.Info().
 				Str("severity", "INFO").
@@ -117,37 +155,16 @@ func (yt *Youtube) Video(vid []string) ([]YoutubeVideoResponse, error) {
 	return yvs, nil
 }
 
-// Youtube Data API から動画情報を取得
-func (yt *Youtube) Video2(vid []string) ([]*youtube.Video, error) {
-	var yvs []*youtube.Video
-	for i := 0; i*50 <= len(vid); i++ {
-		var id string
-		if len(vid) > 50*(i+1) {
-			id = strings.Join(vid[50*i:50*(i+1)], ",")
-		} else {
-			id = strings.Join(vid[50*i:], ",")
-		}
-		call := YoutubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(id).MaxResults(50)
-		res, err := call.Do()
-		if err != nil {
-			log.Error().Str("severity", "ERROR").Err(err).Msg("videos-list call error")
-			return []*youtube.Video{}, err
-		}
-		yvs = append(yvs, res.Items...)
-	}
-	return yvs, nil
-}
-
 // 歌ってみた動画かフィルターをかける処理
-func (yt *Youtube) Select(yvs []YoutubeVideoResponse) ([]YoutubeSelectResponse, error) {
-	var ysr []YoutubeSelectResponse
+func (list YTVRList) Select() (YTSRList, error) {
+	var ysr []YouTubeSelectResponse
 	// にじさんじライバーのチャンネルリストを取得
 	channelIdList, err := GetChannelIdList()
 	if err != nil {
 		return nil, err
 	}
 	// 歌動画か判断する
-	for _, video := range yvs {
+	for _, video := range list {
 		// プレミア公開する動画か
 		if video.Schedule == "" {
 			continue
@@ -169,11 +186,11 @@ func (yt *Youtube) Select(yvs []YoutubeVideoResponse) ([]YoutubeSelectResponse, 
 			continue
 		}
 
-		ysr = append(ysr, YoutubeSelectResponse{ID: video.ID, Title: video.Title, Schedule: video.Schedule, SongConfirm: checkRes})
+		ysr = append(ysr, YouTubeSelectResponse{ID: video.ID, Title: video.Title, Schedule: video.Schedule, SongConfirm: checkRes})
 
 		log.Info().
 			Str("severity", "INFO").
-			Str("service", "youtube-video-list").
+			Str("service", "youtube-video-select").
 			Str("id", video.ID).
 			Str("title", video.Title).
 			Str("duration", video.Duration).
@@ -184,7 +201,7 @@ func (yt *Youtube) Select(yvs []YoutubeVideoResponse) ([]YoutubeSelectResponse, 
 }
 
 // 動画情報をDBに保存
-func (yt *Youtube) Save(ysr []YoutubeSelectResponse) error {
+func (list YTSRList) Save() error {
 	tx, err := DB.Begin()
 	if err != nil {
 		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Begin error")
@@ -197,7 +214,7 @@ func (yt *Youtube) Save(ysr []YoutubeSelectResponse) error {
 		return err
 	}
 
-	for _, video := range ysr {
+	for _, video := range list {
 		// DBに動画情報を保存
 		_, err := stmt.Exec(video.ID, video.Title, video.SongConfirm, video.Schedule)
 		if err != nil {
@@ -225,7 +242,7 @@ func (yt *Youtube) CheckVideo(vid string) (bool, error) {
 	// エラー表示に使うカスタムログの設定
 	clog := log.Error().Str("severity", "ERROR").Str("service", "youtube-check-video")
 	// Youtube Data API にリクエスト送信して動画情報を取得
-	call := YoutubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(vid).MaxResults(1)
+	call := YouTubeService.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(vid).MaxResults(1)
 	res, err := call.Do()
 	if err != nil {
 		clog.Err(err).Msg("videos-list call error")
@@ -258,4 +275,125 @@ func (yt *Youtube) CheckVideo(vid string) (bool, error) {
 	}
 	// DBに保存されている動画情報がAPIから取得したデータと同じ場合
 	return false, nil
+}
+
+// チャンネルIDとプレイリストIDとチャンネルにアップロードされた動画の数を取得
+func Channels() (YTCRList, error) {
+	var cResList []YouTubeChannelsResponse
+	// にじさんじライバーのチャンネルリストを取得
+	cList, err := GetChannelIdList()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 0; i*50 <= len(cList); i++ {
+		var id string
+		if len(cList) > 50*(i+1) {
+			id = strings.Join(cList[50*i:50*(i+1)], ",")
+		} else {
+			id = strings.Join(cList[50*i:], ",")
+		}
+		call := YouTubeService.Channels.List([]string{"statistics", "contentDetails"}).MaxResults(50).Id(id)
+		res, err := call.Do()
+		if err != nil {
+			log.Error().Str("severity", "ERROR").Err(err).Msg("channels-list call error")
+			return []YouTubeChannelsResponse{}, err
+		}
+
+		for _, item := range res.Items {
+			cResList = append(cResList, YouTubeChannelsResponse{ID: item.Id, VideoCount: item.Statistics.VideoCount, PlaylistID: item.ContentDetails.RelatedPlaylists.Uploads})
+		}
+	}
+	return cResList, nil
+}
+
+// 新しく取得したチャンネルの動画数をDBに保存
+func (clist YTCRList) Save() error {
+	tx, err := DB.Begin()
+	if err != nil {
+		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Begin error")
+		return err
+	}
+	// 動画が削除されて動画数が減っていても、上書きする
+	stmt, err := tx.Prepare("UPDATE vtubers SET video_count = ? WHERE id = ? AND video_count != ?")
+	if err != nil {
+		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Prepare error")
+		return err
+	}
+
+	for _, list := range clist {
+		_, err := stmt.Exec(list.VideoCount, list.ID, list.VideoCount)
+		if err != nil {
+			log.Error().Str("severity", "ERROR").Err(err).Msg("Save video_count failed")
+			if tx.Rollback() != nil {
+				log.Error().Str("severity", "ERROR").Err(err).Msg("Rollback error")
+			}
+			return err
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Error().Str("severity", "ERROR").Err(err).Msg("tx.Commit error")
+		return err
+	}
+
+	return nil
+}
+
+// 新しく動画をアップロードしたチャンネルIDと古い動画数と新しい動画の数を返す
+func (newlist YTCRList) CheckUpload() (NewUpChList, error) {
+	// 新しく動画をアップロードしたチャンネルIDを格納する変数
+	var diffCList NewUpChList
+	// DBに保存されているチャンネルIDとそのチャンネルの動画本数の一覧を取得 map[string] uint64
+	vvcList, err := GetVideoCountList()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, newCh := range newlist {
+		// DBに保存されている動画の本数より、新しく取得した動画の本数が多い場合　動画が削除されて数が減っている場合は返さない
+		if vvcList[newCh.ID] < newCh.VideoCount {
+			log.Info().
+				Str("severity", "INFO").
+				Str("service", "youtube-check-upload").
+				Str("ChannelId", newCh.ID).
+				Uint64("NewVideoCount", newCh.VideoCount).
+				Uint64("OldVideoCount", vvcList[newCh.ID]).
+				Send()
+			diffCList = append(diffCList, NewUploadChannelList{ID: newCh.ID, NewVideoCount: newCh.VideoCount, OldVideoCount: vvcList[newCh.ID], PlaylistID: newCh.PlaylistID})
+		}
+	}
+	return diffCList, nil
+}
+
+// 新しくアップロードされた動画のIDを取得
+func (list NewUpChList) GetNewVideoId() (VideoIDList, error) {
+	// 動画IDを格納する文字列型配列を宣言
+	vid := make([]string, 0, 600)
+
+	for _, ch := range list {
+		// 取得した動画IDをログに出力するための変数
+		var rid []string
+		call := YouTubeService.PlaylistItems.List([]string{"snippet", "contentDetails"}).PlaylistId(ch.PlaylistID).MaxResults(int64(ch.NewVideoCount - ch.OldVideoCount))
+		res, err := call.Do()
+		if err != nil {
+			log.Error().Str("severity", "ERROR").Err(err).Msg("playlistitems-list call error")
+			return []string{}, err
+		}
+
+		for _, item := range res.Items {
+			rid = append(rid, item.ContentDetails.VideoId)
+			vid = append(vid, item.ContentDetails.VideoId)
+		}
+
+		log.Info().
+			Str("severity", "INFO").
+			Str("service", "youtube-playlistitems-list").
+			Str("ChannelId", ch.ID).
+			Str("PlaylistId", ch.PlaylistID).
+			Strs("videoId", rid).
+			Send()
+	}
+	return vid, nil
 }

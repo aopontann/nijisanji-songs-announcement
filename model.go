@@ -9,10 +9,12 @@ import (
 )
 
 type getVideoInfo struct {
-	ID    string `json:"id"`
-	Title string `json:"title"`
+	ID        string `json:"id"`
+	Title     string `json:"title"`
 	TwitterID string `json:"twitter_id"`
 }
+
+type VtuberVideoCountResponse map[string] uint64
 
 // タイトルにこの文字が含まれていると歌動画確定
 var definiteList = []string{
@@ -76,6 +78,33 @@ func GetChannelIdList() ([]string, error) {
 		return channelIdList, err
 	}
 	return channelIdList, nil
+}
+
+// にじさんじライバーのチャンネルIDとアップロードされた動画の数の一覧を取得する
+func GetVideoCountList() (VtuberVideoCountResponse, error) {
+	var (
+		channelId string
+		VideoCount uint64
+	)
+	vvcList := VtuberVideoCountResponse{}
+	rows, err := DB.Query("select id, video_count from vtubers")
+	if err != nil {
+		log.Error().Str("severity", "ERROR").Err(err).Msg("select vtuber failed")
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		err := rows.Scan(&channelId, &VideoCount)
+		if err != nil {
+			return nil, err
+		}
+		vvcList[channelId] = VideoCount
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+	return vvcList, nil
 }
 
 // 時間を指定して動画を取得する
