@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-func sendMail(tid string, subject string, message string) error {
+func SendMail(subject string, message string) error {
     auth := smtp.PlainAuth(
         "",
         "aopontan0416@gmail.com", // 送信に使うアカウント
@@ -22,8 +22,6 @@ func sendMail(tid string, subject string, message string) error {
             "To: aopontan0416@gmail.com\r\n" +
             "Subject:" + subject + "\r\n" +
             "\r\n" +
-            message + "\r\n" +
-            "\r\n" +
-            "Tweet URL: https://twitter.com/demo/status/" + tid + "\r\n"),
+            message + "\r\n"),
     )
 }
