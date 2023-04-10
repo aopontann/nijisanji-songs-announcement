@@ -41,12 +41,14 @@ type YouTubeCheckResponse struct {
 type YouTubeChannelsResponse struct {
 	ID         string `json:"id"`
 	VideoCount uint64 `json:"video_count"`
+	PlaylistID string `json:"playlist_id"`
 }
 
 type NewUploadChannelList struct {
 	ID            string `json:"id"`
 	NewVideoCount uint64 `json:"new_video_count"`
 	OldVideoCount uint64 `json:"old_video_count"`
+	PlaylistID string `json:"playlist_id"`
 }
 
 type VideoIDList []string
@@ -314,7 +316,7 @@ func Activities() (VideoIDList, error) {
 	return vid, nil
 }
 
-// チャンネルIDとチャンネルにアップロードされた動画の数を取得
+// チャンネルIDとプレイリストIDとチャンネルにアップロードされた動画の数を取得
 func Channels() (YTCRList, error) {
 	var cResList []YouTubeChannelsResponse
 	// にじさんじライバーのチャンネルリストを取得
@@ -330,7 +332,7 @@ func Channels() (YTCRList, error) {
 		} else {
 			id = strings.Join(cList[50*i:], ",")
 		}
-		call := YouTubeService.Channels.List([]string{"statistics"}).MaxResults(50).Id(id)
+		call := YouTubeService.Channels.List([]string{"statistics", "contentDetails"}).MaxResults(50).Id(id)
 		res, err := call.Do()
 		if err != nil {
 			log.Error().Str("severity", "ERROR").Err(err).Msg("channels-list call error")
@@ -338,7 +340,7 @@ func Channels() (YTCRList, error) {
 		}
 
 		for _, item := range res.Items {
-			cResList = append(cResList, YouTubeChannelsResponse{ID: item.Id, VideoCount: item.Statistics.VideoCount})
+			cResList = append(cResList, YouTubeChannelsResponse{ID: item.Id, VideoCount: item.Statistics.VideoCount, PlaylistID: item.ContentDetails.RelatedPlaylists.Uploads})
 		}
 	}
 	return cResList, nil
@@ -398,39 +400,37 @@ func (newlist YTCRList) CheckUpload() (NewUpChList, error) {
 				Uint64("NewVideoCount", newCh.VideoCount).
 				Uint64("OldVideoCount", vvcList[newCh.ID]).
 				Send()
-			diffCList = append(diffCList, NewUploadChannelList{ID: newCh.ID, NewVideoCount: newCh.VideoCount, OldVideoCount: vvcList[newCh.ID]})
+			diffCList = append(diffCList, NewUploadChannelList{ID: newCh.ID, NewVideoCount: newCh.VideoCount, OldVideoCount: vvcList[newCh.ID], PlaylistID: newCh.PlaylistID})
 		}
 	}
 	return diffCList, nil
 }
 
 // 新しくアップロードされた動画のIDを取得
-func (list NewUpChList) Search() (VideoIDList, error) {
+func (list NewUpChList) GetNewVideoId() (VideoIDList, error) {
 	// 動画IDを格納する文字列型配列を宣言
 	vid := make([]string, 0, 600)
 
 	for _, ch := range list {
 		// 取得した動画IDをログに出力するための変数
 		var rid []string
-		call := YouTubeService.Search.List([]string{"snippet"}).ChannelId(ch.ID).MaxResults(int64(ch.NewVideoCount - ch.OldVideoCount)).Order("date")
+		call := YouTubeService.PlaylistItems.List([]string{"snippet", "contentDetails"}).PlaylistId(ch.PlaylistID).MaxResults(int64(ch.NewVideoCount - ch.OldVideoCount))
 		res, err := call.Do()
 		if err != nil {
-			log.Error().Str("severity", "ERROR").Err(err).Msg("search-list call error")
+			log.Error().Str("severity", "ERROR").Err(err).Msg("playlistitems-list call error")
 			return []string{}, err
 		}
 
 		for _, item := range res.Items {
-			if item.Id.Kind != "youtube#video" {
-				continue
-			}
-			rid = append(rid, item.Id.VideoId)
-			vid = append(vid, item.Id.VideoId)
+			rid = append(rid, item.ContentDetails.VideoId)
+			vid = append(vid, item.ContentDetails.VideoId)
 		}
 
 		log.Info().
 			Str("severity", "INFO").
-			Str("service", "youtube-search-list").
+			Str("service", "youtube-playlistitems-list").
 			Str("ChannelId", ch.ID).
+			Str("PlaylistId", ch.PlaylistID).
 			Strs("videoId", rid).
 			Send()
 	}
