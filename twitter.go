@@ -24,9 +24,6 @@ type GetTweetContext struct {
 	Text string `json:"text"`
 }
 
-// Searchで使用するカスタムエラーログ
-var twlog = log.Info().Str("service", "twitter-search").Str("severity", "ERROR")
-
 // 歌動画の告知ツイート
 func (tw *Twitter) Post(v getVideoInfo) error {
 	const endpoint = "https://api.twitter.com/2/tweets"
