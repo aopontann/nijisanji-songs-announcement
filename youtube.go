@@ -277,45 +277,6 @@ func (yt *Youtube) CheckVideo(vid string) (bool, error) {
 	return false, nil
 }
 
-func Activities() (VideoIDList, error) {
-	// 動画IDを格納する文字列型配列を宣言
-	vid := make([]string, 0, 600)
-
-	// にじさんじライバーのチャンネルリストを取得
-	channelIdList, err := GetChannelIdList()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, cid := range channelIdList {
-		// 取得した動画IDをログに出力するための変数
-		var rid []string
-		call := YouTubeService.Activities.List([]string{"snippet", "contentDetails"}).ChannelId(cid).MaxResults(5)
-		res, err := call.Do()
-		if err != nil {
-			log.Error().Str("severity", "ERROR").Err(err).Msg("activities-list call error")
-			return []string{}, err
-		}
-
-		for _, item := range res.Items {
-			if item.Snippet.Type != "upload" {
-				continue
-			}
-			rid = append(rid, item.ContentDetails.Upload.VideoId)
-			vid = append(vid, item.ContentDetails.Upload.VideoId)
-		}
-
-		log.Info().
-			Str("severity", "INFO").
-			Str("service", "youtube-activities-list").
-			Str("ChannelId", cid).
-			Strs("rid", rid).
-			Str("pageInfo", fmt.Sprintf("perPage=%d total=%d nextPage=%s\n", res.PageInfo.ResultsPerPage, res.PageInfo.TotalResults, res.NextPageToken)).
-			Send()
-	}
-	return vid, nil
-}
-
 // チャンネルIDとプレイリストIDとチャンネルにアップロードされた動画の数を取得
 func Channels() (YTCRList, error) {
 	var cResList []YouTubeChannelsResponse

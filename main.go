@@ -41,7 +41,6 @@ func main() {
 	http.HandleFunc("/error", h2)
 	http.HandleFunc("/mail", send)
 	http.HandleFunc("/youtube", YoutubeHandler)
-	http.HandleFunc("/youtube/activities", YouTubeActivitiesHandler)
 	http.HandleFunc("/youtube/updateVideoCount", UpdateVideoCountHandler)
 	http.HandleFunc("/youtube/checkNewVideo", CheckNewUploadHandler)
 	http.HandleFunc("/twitter", TwitterHandler)
