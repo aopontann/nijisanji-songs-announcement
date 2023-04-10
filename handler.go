@@ -117,7 +117,7 @@ func CheckNewUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vid, err := newVideoList.Search()
+	vid, err := newVideoList.GetNewVideoId()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
