@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -100,12 +101,14 @@ func CheckNewUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, v := range ysr {
-		err := SendMail("新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID))
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			return
+	if os.Getenv("ENV") != "dev" {
+		for _, v := range ysr {
+			err := SendMail("新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID))
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(err.Error()))
+				return
+			}
 		}
 	}
 
