@@ -46,6 +46,15 @@ func main() {
 		io.WriteString(w, "success-db-ping\n")
 	}
 
+	tweet := func(w http.ResponseWriter, _ *http.Request) {
+		err := Tweets()
+		if err != nil {
+			io.WriteString(w, "failed-tweet\n")
+			return
+		}
+		io.WriteString(w, "success-tweet\n")
+	}
+
 	http.HandleFunc("/ping", h1)
 	http.HandleFunc("/error", h2)
 	http.HandleFunc("/mail", send)
@@ -54,6 +63,7 @@ func main() {
 	http.HandleFunc("/youtube/updateVideoCount", UpdateVideoCountHandler)
 	http.HandleFunc("/youtube/checkNewVideo", CheckNewUploadHandler)
 	http.HandleFunc("/twitter", TwitterHandler)
+	http.HandleFunc("/test/tweet", tweet)
 
 	// log.Debug().Msgf("listening on port %s", port)
 
