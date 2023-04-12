@@ -1,20 +1,18 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"regexp"
 
 	"github.com/rs/zerolog/log"
 )
 
-type getVideoInfo struct {
-	ID        string `json:"id"`
-	Title     string `json:"title"`
-	TwitterID string `json:"twitter_id"`
+type GetVideoInfo struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
 }
 
-type VtuberVideoCountResponse map[string] uint64
+type VtuberVideoCountResponse map[string]uint64
 
 // タイトルにこの文字が含まれていると歌動画確定
 var definiteList = []string{
@@ -83,7 +81,7 @@ func GetChannelIdList() ([]string, error) {
 // にじさんじライバーのチャンネルIDとアップロードされた動画の数の一覧を取得する
 func GetVideoCountList() (VtuberVideoCountResponse, error) {
 	var (
-		channelId string
+		channelId  string
 		VideoCount uint64
 	)
 	vvcList := VtuberVideoCountResponse{}
@@ -108,33 +106,28 @@ func GetVideoCountList() (VtuberVideoCountResponse, error) {
 }
 
 // 時間を指定して動画を取得する
-func GetVideos(at string, bt string) ([]getVideoInfo, error) {
+func GetVideos(at string, bt string) ([]GetVideoInfo, error) {
 	var (
 		id        string
 		title     string
-		tid       sql.NullString
-		videoList []getVideoInfo
+		videoList []GetVideoInfo
 	)
-	rows, err := DB.Query("SELECT id, title, twitter_id FROM videos WHERE songConfirm = 1 AND scheduled_start_time >= ? AND scheduled_start_time <= ?", at, bt)
+	rows, err := DB.Query("SELECT id, title FROM videos WHERE songConfirm = 1 AND scheduled_start_time >= ? AND scheduled_start_time <= ?", at, bt)
 	if err != nil {
 		log.Error().Str("severity", "ERROR").Err(err).Msg("select videos failed")
-		return []getVideoInfo{}, err
+		return []GetVideoInfo{}, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		err := rows.Scan(&id, &title, &tid)
+		err := rows.Scan(&id, &title)
 		if err != nil {
-			return []getVideoInfo{}, err
+			return []GetVideoInfo{}, err
 		}
-		if tid.Valid {
-			videoList = append(videoList, getVideoInfo{ID: id, Title: title, TwitterID: tid.String})
-		} else {
-			videoList = append(videoList, getVideoInfo{ID: id, Title: title, TwitterID: ""})
-		}
+		videoList = append(videoList, GetVideoInfo{ID: id, Title: title})
 	}
 	err = rows.Err()
 	if err != nil {
-		return []getVideoInfo{}, err
+		return []GetVideoInfo{}, err
 	}
 	return videoList, nil
 }
