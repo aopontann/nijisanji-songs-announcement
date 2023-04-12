@@ -47,7 +47,8 @@ func main() {
 	}
 
 	tweet := func(w http.ResponseWriter, _ *http.Request) {
-		err := Tweets()
+		video := GetVideoInfo{ID: "test", Title: "test"}
+		err := video.Tweets()
 		if err != nil {
 			io.WriteString(w, "failed-tweet\n")
 			return

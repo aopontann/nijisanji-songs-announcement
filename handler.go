@@ -9,8 +9,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var tw = Twitter{}
-
 func YoutubeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed) // 405
@@ -157,7 +155,7 @@ func TwitterHandler(w http.ResponseWriter, r *http.Request) {
 		// if changed {
 		// 	continue
 		// }
-		err = tw.Post(video)
+		err = video.Tweets()
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
