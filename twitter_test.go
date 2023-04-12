@@ -5,7 +5,8 @@ import (
 )
 
 func TestTweets(t *testing.T) {
-	err := Tweets()
+	video := GetVideoInfo{ID: "test", Title: "test"}
+	err := video.Tweets()
 	if err != nil {
 		t.Errorf("Tweets Error")
 	}
