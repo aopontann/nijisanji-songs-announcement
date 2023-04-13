@@ -11,17 +11,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - id: 'auth'
         name: 'Authenticate to Google Cloud'
-        uses: 'google-github-actions/auth@v0'
+        uses: 'google-github-actions/auth@v1'
         with:
           # create_credentials_file: true
           workload_identity_provider: 'projects/${{ vars.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/${{ vars.POOL_ID }}/providers/${{ vars.PROVIDER_ID }}'
           service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
       
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v0
-      - name: Describe my-service-account
-        run: gcloud iam service-accounts describe '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+      - id: 'deploy'
+        uses: 'google-github-actions/deploy-cloudrun@v1'
+        with:
+          service: 'hello-cloud-run'
+          image: 'gcr.io/cloudrun/hello'
+
+      - name: 'Use output'
+        run: 'curl "${{ steps.deploy.outputs.url }}"'
