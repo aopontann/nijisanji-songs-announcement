@@ -20,11 +20,27 @@ jobs:
           workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
           service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
       
-      - id: 'deploy'
-        uses: 'google-github-actions/deploy-cloudrun@v1'
-        with:
-          service: 'hello-cloud-run'
-          image: 'gcr.io/cloudrun/hello'
+      # https://github.com/hashicorp/setup-terraform
+      - uses: hashicorp/setup-terraform@v2
+  
+      - name: Terraform fmt
+        id: fmt
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+  
+      - name: Terraform Init
+        id: init
+        run: terraform init
+  
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+  
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color
+        continue-on-error: true
 
-      - name: 'Use output'
-        run: 'curl "${{ steps.deploy.outputs.url }}"'
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply
