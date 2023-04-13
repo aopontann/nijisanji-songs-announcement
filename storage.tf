@@ -1,5 +1,5 @@
 resource "google_storage_bucket" "storage" {
-  name          = "nsa-bot-storage-test"
+  name          = "nsa-bot-storage-test-2"
   location      = "asia-northeast1"
   
   force_destroy = true
