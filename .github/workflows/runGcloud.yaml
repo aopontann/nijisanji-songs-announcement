@@ -17,9 +17,8 @@ jobs:
         name: 'Authenticate to Google Cloud'
         uses: 'google-github-actions/auth@v1'
         with:
-          # create_credentials_file: true
-          workload_identity_provider: 'projects/${{ vars.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/${{ vars.POOL_ID }}/providers/${{ vars.PROVIDER_ID }}'
-          service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
+          service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
       
       - id: 'deploy'
         uses: 'google-github-actions/deploy-cloudrun@v1'
