@@ -14,6 +14,10 @@
 				"eamodio.gitlens"
 			]
 		}
+	},
+	"features": {
+		"ghcr.io/devcontainers/features/terraform:1": {},
+		"ghcr.io/dhoeric/features/google-cloud-cli:1": {}
 	}
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
