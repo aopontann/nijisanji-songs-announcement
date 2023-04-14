@@ -11,7 +11,7 @@ provider "google" {
 }
 
 resource "google_cloud_scheduler_job" "job" {
-  name             = "test-job"
+  name             = "test-job-2"
   description      = "test http job"
   schedule         = "*/8 * * * *"
   time_zone        = "Asia/Tokyo"
