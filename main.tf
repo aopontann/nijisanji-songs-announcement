@@ -11,6 +11,7 @@ provider "google" {
 }
 
 resource "google_cloud_scheduler_job" "job" {
+  paused           = true
   name             = "test-job-2"
   description      = "test http job"
   schedule         = "*/8 * * * *"
