@@ -2,7 +2,7 @@ resource "google_cloud_scheduler_job" "job" {
   name             = "test-job"
   description      = "test http job"
   schedule         = "*/8 * * * *"
-  time_zone        = "America/New_York"
+  time_zone        = "Asia/Tokyo"
   attempt_deadline = "320s"
 
   retry_config {
