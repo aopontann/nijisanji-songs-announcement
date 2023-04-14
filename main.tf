@@ -1,3 +1,15 @@
+terraform {
+  backend "gcs" {
+    bucket = "nsa-terraform-state"
+    prefix = "terraform/state"
+  }
+}
+
+provider "google" {
+  project = var.project_id
+  region  = "asia-northeast1"
+}
+
 resource "google_cloud_scheduler_job" "job" {
   name             = "test-job"
   description      = "test http job"
