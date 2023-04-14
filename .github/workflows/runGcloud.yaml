@@ -40,12 +40,12 @@ jobs:
         id: plan
         run: terraform plan -no-color -input=false 
         env:
-          project_id: '${{ secrets.TF_VAR_PROJECT_ID }}'
-          cloud_run_service_url: '${{ secrets.TF_VAR_CLOUD_RUN_SERVICE_URL_DEV }}'
+          TF_VAR_project_id: '${{ secrets.TF_VAR_PROJECT_ID }}'
+          TF_VAR_cloud_run_service_url: '${{ secrets.TF_VAR_CLOUD_RUN_SERVICE_URL_DEV }}'
 
       - name: Terraform Apply
         id: apply
         run: terraform apply -auto-approve -input=false
         env:
-          project_id: '${{ secrets.TF_VAR_PROJECT_ID }}'
-          cloud_run_service_url: '${{ secrets.TF_VAR_CLOUD_RUN_SERVICE_URL_DEV }}'
+          TF_VAR_project_id: '${{ secrets.TF_VAR_PROJECT_ID }}'
+          TF_VAR_cloud_run_service_url: '${{ secrets.TF_VAR_CLOUD_RUN_SERVICE_URL_DEV }}'
