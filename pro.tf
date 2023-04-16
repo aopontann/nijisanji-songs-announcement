@@ -4,7 +4,7 @@ resource "google_cloud_scheduler_job" "nsa_bot_pro_tweet" {
   schedule         = "*/5 * * * *"
   time_zone        = "Asia/Tokyo"
   attempt_deadline = "300s"
-  paused = true
+  # paused = true
 
   retry_config {
     retry_count = 1
