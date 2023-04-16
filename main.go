@@ -37,13 +37,34 @@ func main() {
 		io.WriteString(w, "send-demo\n")
 	}
 
+	dbPing := func(w http.ResponseWriter, _ *http.Request) {
+		err := DB.Ping()
+		if err != nil {
+			io.WriteString(w, "failed-db-ping\n")
+			return
+		}
+		io.WriteString(w, "success-db-ping\n")
+	}
+
+	tweet := func(w http.ResponseWriter, _ *http.Request) {
+		video := GetVideoInfo{ID: "test", Title: "test"}
+		err := video.Tweets()
+		if err != nil {
+			io.WriteString(w, "failed-tweet\n")
+			return
+		}
+		io.WriteString(w, "success-tweet\n")
+	}
+
 	http.HandleFunc("/ping", h1)
 	http.HandleFunc("/error", h2)
 	http.HandleFunc("/mail", send)
+	http.HandleFunc("/dbping", dbPing)
 	http.HandleFunc("/youtube", YoutubeHandler)
 	http.HandleFunc("/youtube/updateVideoCount", UpdateVideoCountHandler)
 	http.HandleFunc("/youtube/checkNewVideo", CheckNewUploadHandler)
 	http.HandleFunc("/twitter", TwitterHandler)
+	http.HandleFunc("/test/tweet", tweet)
 
 	// log.Debug().Msgf("listening on port %s", port)
 

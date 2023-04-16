@@ -7,6 +7,8 @@ require (
 	google.golang.org/api v0.73.0
 )
 
+require github.com/dghubble/oauth1 v0.7.2 // indirect
+
 require (
 	cloud.google.com/go/compute v1.5.0 // indirect
 	github.com/go-sql-driver/mysql v1.6.0
