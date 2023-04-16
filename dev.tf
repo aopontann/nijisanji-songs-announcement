@@ -1,10 +1,9 @@
-resource "google_cloud_scheduler_job" "job" {
-  paused           = true
-  name             = "test-job-2"
-  description      = "test http job"
-  schedule         = "*/8 * * * *"
+resource "google_cloud_scheduler_job" "nsa_bot_dev_tweet" {
+  name             = "nsa-bot-dev-tweet"
+  description      = "歌ってみた動画の告知を行う"
+  schedule         = "*/5 * * * *"
   time_zone        = "Asia/Tokyo"
-  attempt_deadline = "320s"
+  attempt_deadline = "300s"
 
   retry_config {
     retry_count = 1
@@ -12,6 +11,6 @@ resource "google_cloud_scheduler_job" "job" {
 
   http_target {
     http_method = "POST"
-    uri         = "${var.cloud_run_service_url_dev}/ping"
+    uri         = "${var.cloud_run_service_url_dev}/twitter"
   }
 }
