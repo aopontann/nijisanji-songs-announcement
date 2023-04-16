@@ -3,7 +3,12 @@ variable "project_id" {
   type        = string
 }
 
-variable "cloud_run_service_url" {
-  description = "CloudRunサービスのURL"
+variable "cloud_run_service_url_dev" {
+  description = "開発用CloudRunサービスのURL"
+  type        = string
+}
+
+variable "cloud_run_service_url_pro" {
+  description = "本番用CloudRunサービスのURL"
   type        = string
 }
