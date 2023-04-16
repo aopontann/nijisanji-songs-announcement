@@ -1,6 +1,10 @@
 name: runGcloud
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - '**.tf'
+      - '.github/workflows/**'
 jobs:
   build:
     # Allow the job to fetch a GitHub ID token
@@ -41,11 +45,13 @@ jobs:
         run: terraform plan -no-color -input=false 
         env:
           TF_VAR_project_id: '${{ secrets.TF_VAR_PROJECT_ID }}'
-          TF_VAR_cloud_run_service_url: '${{ secrets.TF_VAR_CLOUD_RUN_SERVICE_URL_DEV }}'
+          TF_VAR_cloud_run_service_url_dev: '${{ secrets.TF_VAR_CLOUD_RUN_SERVICE_URL_DEV }}'
+          TF_VAR_cloud_run_service_url_pro: '${{ secrets.TF_VAR_CLOUD_RUN_SERVICE_URL_PRO }}'
 
       - name: Terraform Apply
         id: apply
         run: terraform apply -auto-approve -input=false
         env:
           TF_VAR_project_id: '${{ secrets.TF_VAR_PROJECT_ID }}'
-          TF_VAR_cloud_run_service_url: '${{ secrets.TF_VAR_CLOUD_RUN_SERVICE_URL_DEV }}'
+          TF_VAR_cloud_run_service_url_dev: '${{ secrets.TF_VAR_CLOUD_RUN_SERVICE_URL_DEV }}'
+          TF_VAR_cloud_run_service_url_pro: '${{ secrets.TF_VAR_CLOUD_RUN_SERVICE_URL_PRO }}'
