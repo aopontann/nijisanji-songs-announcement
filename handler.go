@@ -190,7 +190,12 @@ func CheckNewVideoHAndler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, v := range ysr {
-		err := SendMail("【開発用】新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID))
+		var err error
+		if os.Getenv("ENV") == "dev" {
+			err = SendMail("【開発用】新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID))
+		} else {
+			err = SendMail("新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID))
+		}
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
