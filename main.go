@@ -56,14 +56,29 @@ func main() {
 		io.WriteString(w, "success-tweet\n")
 	}
 
+	seed := func(w http.ResponseWriter, _ *http.Request) {
+		err := PlaylistsSeed()
+		if err != nil {
+			io.WriteString(w, "failed-seed\n")
+			return
+		}
+		io.WriteString(w, "success-seed\n")
+	}
+	
+	http.HandleFunc("/youtube/updateVideoCount", UpdateVideoCountHandler)
+	http.HandleFunc("/youtube/checkNewVideo", CheckNewUploadHandler)
+	http.HandleFunc("/twitter", TwitterHandler)
+
+	http.HandleFunc("/item-count", UpdateItemCountHandler) // PUT
+	http.HandleFunc("/check-new-video", CheckNewVideoHAndler) // POST
+	
+	// 検証用
 	http.HandleFunc("/ping", h1)
 	http.HandleFunc("/error", h2)
 	http.HandleFunc("/mail", send)
 	http.HandleFunc("/dbping", dbPing)
 	http.HandleFunc("/youtube", YoutubeHandler)
-	http.HandleFunc("/youtube/updateVideoCount", UpdateVideoCountHandler)
-	http.HandleFunc("/youtube/checkNewVideo", CheckNewUploadHandler)
-	http.HandleFunc("/twitter", TwitterHandler)
+	http.HandleFunc("/seed", seed)
 	http.HandleFunc("/test/tweet", tweet)
 
 	// log.Debug().Msgf("listening on port %s", port)
