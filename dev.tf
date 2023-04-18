@@ -29,6 +29,6 @@ resource "google_cloud_scheduler_job" "nsa_bot_dev_check_new_video" {
 
   http_target {
     http_method = "POST"
-    uri         = "${var.cloud_run_service_url_dev}/youtube/checkNewVideo"
+    uri         = "${var.cloud_run_service_url_dev}/check-new-video"
   }
 }
