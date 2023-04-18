@@ -504,8 +504,8 @@ func (plist YTPRList) Items() (VideoIDList, error) {
 		}
 
 		for _, item := range res.Items {
-			rid = append(rid, item.ContentDetails.VideoId)
-			vid = append(vid, item.ContentDetails.VideoId)
+			rid = append(rid, item.Snippet.ResourceId.VideoId)
+			vid = append(vid, item.Snippet.ResourceId.VideoId)
 		}
 
 		log.Info().
