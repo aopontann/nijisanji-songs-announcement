@@ -40,8 +40,14 @@ type YouTubeCheckResponse struct {
 
 type YouTubeChannelsResponse struct {
 	ID         string `json:"id"`
-	VideoCount uint64 `json:"video_count"`
 	PlaylistID string `json:"playlist_id"`
+	VideoCount uint64 `json:"video_count"`
+}
+
+type YouTubePlaylistsResponse struct {
+	ID         string `json:"id"`
+	PlaylistID string `json:"playlist_id"`
+	ItemCount int64 `json:"item_count"`
 }
 
 type NewUploadChannelList struct {
@@ -57,6 +63,9 @@ type YTSRList []YouTubeSelectResponse
 
 // チャンネルIDと最新の動画数を格納する配列の型
 type YTCRList []YouTubeChannelsResponse
+
+// チャンネルIDとプレイリストID、プレイリストに含まれる動画数を格納する配列の型
+type YTPRList []YouTubePlaylistsResponse
 
 // 新しく動画をアップロードしたチャンネルIDと古い動画と新しい動画の数を格納する配列の型
 type NewUpChList []NewUploadChannelList
@@ -392,6 +401,118 @@ func (list NewUpChList) GetNewVideoId() (VideoIDList, error) {
 			Str("service", "youtube-playlistitems-list").
 			Str("ChannelId", ch.ID).
 			Str("PlaylistId", ch.PlaylistID).
+			Strs("videoId", rid).
+			Send()
+	}
+	return vid, nil
+}
+
+// チャンネルのアップロードされた動画を含むプレイリストに含まれている動画の数を取得
+func Playlists() (YTPRList, error) {
+	var pResList []YouTubePlaylistsResponse
+	// にじさんじライバーのチャンネルリストを取得
+	plist, err := GetPlaylistsID()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 0; i*50 <= len(plist); i++ {
+		var id string
+		if len(plist) > 50*(i+1) {
+			id = strings.Join(plist[50*i:50*(i+1)], ",")
+		} else {
+			id = strings.Join(plist[50*i:], ",")
+		}
+		call := YouTubeService.Playlists.List([]string{"snippet", "contentDetails"}).MaxResults(50).Id(id)
+		res, err := call.Do()
+		if err != nil {
+			log.Error().Str("severity", "ERROR").Err(err).Msg("playlists-list call error")
+			return []YouTubePlaylistsResponse{}, err
+		}
+
+		for _, item := range res.Items {
+			pResList = append(pResList, YouTubePlaylistsResponse{ID: item.Snippet.ChannelId, PlaylistID: item.Id, ItemCount: item.ContentDetails.ItemCount})
+		}
+	}
+	return pResList, nil
+}
+
+// DBに保存されているプレイリストの動画数とAPIから取得したプレイリストの動画数を比較し、動画数が変わっているプレイリストを返す
+func (plist YTPRList) Select() (YTPRList, error) {
+	var selectedList YTPRList
+	dblist, err := GetItemCount()
+	if err != nil {
+		log.Error().Str("severity", "ERROR").Err(err).Msg("GetItemCount() error")
+		return nil, err
+	}
+
+	for _, list := range plist {
+		if dblist[list.ID] != list.ItemCount {
+			selectedList = append(selectedList, list)
+		}
+	}
+	return selectedList, nil
+}
+
+// プレイリストに含まれている動画の数を更新する
+func (plist YTPRList) Save() error {
+	tx, err := DB.Begin()
+	if err != nil {
+		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Begin error")
+		return err
+	}
+	// 動画が削除されて動画数が減っていても、上書きする
+	stmt, err := tx.Prepare("UPDATE vtubers SET item_count = ? WHERE id = ? AND item_count != ?")
+	if err != nil {
+		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Prepare error")
+		return err
+	}
+
+	for _, list := range plist {
+		_, err := stmt.Exec(list.ItemCount, list.ID, list.ItemCount)
+		if err != nil {
+			log.Error().Str("severity", "ERROR").Err(err).Msg("Save item_count failed")
+			if tx.Rollback() != nil {
+				log.Error().Str("severity", "ERROR").Err(err).Msg("Rollback error")
+			}
+			return err
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Error().Str("severity", "ERROR").Err(err).Msg("tx.Commit error")
+		return err
+	}
+
+	return nil
+}
+
+// プレイリストに含まれている動画IDを取得する
+func (plist YTPRList) Items() (VideoIDList, error) {
+	// 動画IDを格納する文字列型配列を宣言
+	vid := make([]string, 0, 600)
+
+	for _, list := range plist {
+		// 取得した動画IDをログに出力するための変数
+		var rid []string
+		call := YouTubeService.PlaylistItems.List([]string{"snippet"}).PlaylistId(list.PlaylistID).MaxResults(3)
+		res, err := call.Do()
+		if err != nil {
+			log.Error().Str("severity", "ERROR").Err(err).Msg("playlistitems-list call error")
+			return []string{}, err
+		}
+
+		for _, item := range res.Items {
+			rid = append(rid, item.ContentDetails.VideoId)
+			vid = append(vid, item.ContentDetails.VideoId)
+		}
+
+		log.Info().
+			Str("severity", "INFO").
+			Str("service", "youtube-playlistitems-list").
+			Str("ChannelId", list.ID).
+			Str("PlaylistId", list.PlaylistID).
 			Strs("videoId", rid).
 			Send()
 	}
