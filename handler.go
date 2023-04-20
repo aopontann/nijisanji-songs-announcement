@@ -47,85 +47,6 @@ func YoutubeHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Youtube OK"))
 }
 
-func UpdateVideoCountHandler(w http.ResponseWriter, r *http.Request) {
-	chList, err := Channels()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
-	err = chList.Save()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
-	w.Write([]byte("Youtube Channels OK"))
-}
-
-func CheckNewUploadHandler(w http.ResponseWriter, r *http.Request) {
-	chList, err := Channels()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	newVideoList, err := chList.CheckUpload()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	vid, err := newVideoList.GetNewVideoId()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	yvr, err := vid.Video()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	ysr, err := yvr.Select()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	if os.Getenv("ENV") != "dev" {
-		for _, v := range ysr {
-			err := SendMail("新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID))
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(err.Error()))
-				return
-			}
-		}
-	}
-
-	err = ysr.Save()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	err = chList.Save()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
-	w.Write([]byte("checkNewUpload OK"))
-}
-
 func UpdateItemCountHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -153,7 +74,7 @@ func CheckNewVideoHAndler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("POSTだけだよ"))
 		return
 	}
-	
+
 	plist, err := Playlists()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -192,9 +113,9 @@ func CheckNewVideoHAndler(w http.ResponseWriter, r *http.Request) {
 	for _, v := range ysr {
 		var err error
 		if os.Getenv("ENV") == "dev" {
-			err = SendMail("【開発用】新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID))
+			err = SendMail("【開発用】新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.Id))
 		} else {
-			err = SendMail("新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID))
+			err = SendMail("新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.Id))
 		}
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -219,7 +140,7 @@ func CheckNewVideoHAndler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("checkNewVideo OK"))
 }
 
-func TwitterHandler(w http.ResponseWriter, r *http.Request) {
+func TweetHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		w.Write([]byte("POSTだけだよ"))
