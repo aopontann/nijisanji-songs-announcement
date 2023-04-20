@@ -12,7 +12,7 @@ resource "google_cloud_scheduler_job" "nsa_bot_dev_tweet" {
 
   http_target {
     http_method = "POST"
-    uri         = "${var.cloud_run_service_url_dev}/twitter"
+    uri         = "${var.cloud_run_service_url_dev}/tweet"
   }
 }
 
