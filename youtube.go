@@ -13,24 +13,6 @@ import (
 	"google.golang.org/api/youtube/v3"
 )
 
-type Youtube struct{}
-
-type YouTubeVideoResponse struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Schedule    string `json:"schedule"`
-	Duration    string `json:"duration"`
-	ChannelID   string `json:"channel_id"`
-}
-
-type YouTubeSelectResponse struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	Schedule    string `json:"schedule"`
-	SongConfirm bool   `json:"song_confirm"`
-}
-
 type YouTubeCheckResponse struct {
 	ID        string `json:"id"`
 	Title     string `json:"title"`
@@ -47,19 +29,18 @@ type YouTubeChannelsResponse struct {
 type YouTubePlaylistsResponse struct {
 	ID         string `json:"id"`
 	PlaylistID string `json:"playlist_id"`
-	ItemCount int64 `json:"item_count"`
+	ItemCount  int64  `json:"item_count"`
 }
 
 type NewUploadChannelList struct {
 	ID            string `json:"id"`
 	NewVideoCount uint64 `json:"new_video_count"`
 	OldVideoCount uint64 `json:"old_video_count"`
-	PlaylistID string `json:"playlist_id"`
+	PlaylistID    string `json:"playlist_id"`
 }
 
 type VideoIDList []string
-type YTVRList []YouTubeVideoResponse
-type YTSRList []YouTubeSelectResponse
+type YTVRList []youtube.Video
 
 // チャンネルIDと最新の動画数を格納する配列の型
 type YTCRList []YouTubeChannelsResponse
@@ -125,7 +106,7 @@ func Search() (VideoIDList, error) {
 
 // Youtube Data API から動画情報を取得
 func (list VideoIDList) Video() (YTVRList, error) {
-	var yvs []YouTubeVideoResponse
+	var rlist []youtube.Video
 	for i := 0; i*50 <= len(list); i++ {
 		var id string
 		if len(list) > 50*(i+1) {
@@ -137,7 +118,7 @@ func (list VideoIDList) Video() (YTVRList, error) {
 		res, err := call.Do()
 		if err != nil {
 			log.Error().Str("severity", "ERROR").Err(err).Msg("videos-list call error")
-			return []YouTubeVideoResponse{}, err
+			return nil, err
 		}
 
 		for _, video := range res.Items {
@@ -148,7 +129,7 @@ func (list VideoIDList) Video() (YTVRList, error) {
 				scheduledStartTime = strings.Replace(rep1, "Z", "", 1)
 			}
 
-			yvs = append(yvs, YouTubeVideoResponse{ID: video.Id, Title: video.Snippet.Title, Description: video.Snippet.Description, Schedule: scheduledStartTime, Duration: video.ContentDetails.Duration, ChannelID: video.Snippet.ChannelId})
+			rlist = append(rlist, *video)
 
 			log.Info().
 				Str("severity", "INFO").
@@ -161,56 +142,60 @@ func (list VideoIDList) Video() (YTVRList, error) {
 				Send()
 		}
 	}
-	return yvs, nil
+	return rlist, nil
 }
 
 // 歌ってみた動画かフィルターをかける処理
-func (list YTVRList) Select() (YTSRList, error) {
-	var ysr []YouTubeSelectResponse
+func (list YTVRList) Select() (YTVRList, error) {
+	var rlist []youtube.Video
 	// にじさんじライバーのチャンネルリストを取得
 	channelIdList, err := GetChannelIdList()
 	if err != nil {
 		return nil, err
 	}
 	// 歌動画か判断する
-	for _, video := range list {
+	for _, video := range rlist {
 		// プレミア公開する動画か
-		if video.Schedule == "" {
+		if video.LiveStreamingDetails == nil {
+			continue
+		}
+		// 放送が終了していないか
+		if video.Snippet.LiveBroadcastContent != "none" {
 			continue
 		}
 		// 動画の長さが9分59秒以下ではない場合
-		if !regexp.MustCompile(`^PT([1-9]M[1-5]?[0-9]S|[1-5]?[0-9]S)`).Match([]byte(video.Duration)) {
+		if !regexp.MustCompile(`^PT([1-9]M[1-5]?[0-9]S|[1-5]?[0-9]S)`).Match([]byte(video.ContentDetails.Duration)) {
 			continue
 		}
 		// 切り抜き動画である場合
-		if regexp.MustCompile(`.*切り抜き.*`).Match([]byte(video.Title)) {
+		if regexp.MustCompile(`.*切り抜き.*`).Match([]byte(video.Snippet.Title)) {
 			continue
 		}
 		// 動画タイトルに特定の文字が含まれているか
 		// checkRes := TitleCheck(video.Title)
-		checkRes := true
+		// checkRes := true
 
 		// にじさんじライバーのチャンネルで公開されたか
-		if !NijisanjiCheck(channelIdList, video.ChannelID) {
+		if !NijisanjiCheck(channelIdList, video.Snippet.ChannelId) {
 			continue
 		}
 
-		ysr = append(ysr, YouTubeSelectResponse{ID: video.ID, Title: video.Title, Schedule: video.Schedule, SongConfirm: checkRes})
+		rlist = append(rlist, video)
 
 		log.Info().
 			Str("severity", "INFO").
 			Str("service", "youtube-video-select").
-			Str("id", video.ID).
-			Str("title", video.Title).
-			Str("duration", video.Duration).
-			Str("schedule", video.Schedule).
+			Str("id", video.Id).
+			Str("title", video.Snippet.Title).
+			Str("duration", video.ContentDetails.Duration).
+			Str("schedule", video.LiveStreamingDetails.ScheduledStartTime).
 			Send()
 	}
-	return ysr, nil
+	return rlist, nil
 }
 
 // 動画情報をDBに保存
-func (list YTSRList) Save() error {
+func (list YTVRList) Save() error {
 	tx, err := DB.Begin()
 	if err != nil {
 		log.Error().Str("severity", "ERROR").Err(err).Msg("DB.Begin error")
@@ -224,8 +209,11 @@ func (list YTSRList) Save() error {
 	}
 
 	for _, video := range list {
+		// "2022-03-28 11:00:00"形式に変換
+		rep1 := strings.Replace(video.LiveStreamingDetails.ScheduledStartTime, "T", " ", 1)
+		scheduledStartTime := strings.Replace(rep1, "Z", "", 1)
 		// DBに動画情報を保存
-		_, err := stmt.Exec(video.ID, video.Title, video.SongConfirm, video.Schedule)
+		_, err := stmt.Exec(video.Id, video.Snippet.Title, true, scheduledStartTime)
 		if err != nil {
 			log.Error().Str("severity", "ERROR").Err(err).Msg("Save videos failed")
 			if tx.Rollback() != nil {
@@ -245,7 +233,7 @@ func (list YTSRList) Save() error {
 
 // 動画IDからAPIを叩いて動画情報を取得し、DBに保存されている動画情報と異なるデータがある場合、新しい情報に上書きする
 // 上書きした場合やデータを削除した場合は true を返す
-func (yt *Youtube) CheckVideo(vid string) (bool, error) {
+func CheckVideo(vid string) (bool, error) {
 	var title string
 	var scheTime string
 	// エラー表示に使うカスタムログの設定
