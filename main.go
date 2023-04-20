@@ -65,10 +65,7 @@ func main() {
 		io.WriteString(w, "success-seed\n")
 	}
 	
-	http.HandleFunc("/youtube/updateVideoCount", UpdateVideoCountHandler)
-	http.HandleFunc("/youtube/checkNewVideo", CheckNewUploadHandler)
-	http.HandleFunc("/twitter", TwitterHandler)
-
+	http.HandleFunc("/tweet", TweetHandler)
 	http.HandleFunc("/item-count", UpdateItemCountHandler) // PUT
 	http.HandleFunc("/check-new-video", CheckNewVideoHAndler) // POST
 	
@@ -80,8 +77,6 @@ func main() {
 	http.HandleFunc("/youtube", YoutubeHandler)
 	http.HandleFunc("/seed", seed)
 	http.HandleFunc("/test/tweet", tweet)
-
-	// log.Debug().Msgf("listening on port %s", port)
 
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatal().Err(err).Msg("start http server failed")
