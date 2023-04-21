@@ -159,8 +159,8 @@ func (list YTVRList) Select() (YTVRList, error) {
 		if video.LiveStreamingDetails == nil {
 			continue
 		}
-		// 放送が終了していないか
-		if video.Snippet.LiveBroadcastContent != "none" {
+		// 放送が終了している場合
+		if video.Snippet.LiveBroadcastContent == "none" {
 			continue
 		}
 		// 動画の長さが9分59秒以下ではない場合
