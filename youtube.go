@@ -154,7 +154,7 @@ func (list YTVRList) Select() (YTVRList, error) {
 		return nil, err
 	}
 	// 歌動画か判断する
-	for _, video := range rlist {
+	for _, video := range list {
 		// プレミア公開する動画か
 		if video.LiveStreamingDetails == nil {
 			continue
