@@ -96,21 +96,28 @@ func CheckNewVideoHAndler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	yvr, err := vid.Video()
+	vlist, err := vid.Video()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 
-	ysr, err := yvr.Select().IsNijisanji()
+	vlist, err = vlist.Select().IsNijisanji()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 
-	for _, v := range ysr {
+	vlist, err = vlist.NotExist()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	for _, v := range vlist {
 		var err error
 		if os.Getenv("ENV") == "dev" {
 			err = SendMail("【開発用】新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.Id))
@@ -124,7 +131,7 @@ func CheckNewVideoHAndler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	err = ysr.Save()
+	err = vlist.Save()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
