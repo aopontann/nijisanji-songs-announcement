@@ -30,7 +30,7 @@ func YoutubeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ysr, err := yvr.Select()
+	ysr, err := yvr.Select().IsNijisanji()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
@@ -103,7 +103,7 @@ func CheckNewVideoHAndler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ysr, err := yvr.Select()
+	ysr, err := yvr.Select().IsNijisanji()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))

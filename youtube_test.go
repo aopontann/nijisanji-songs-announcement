@@ -19,7 +19,7 @@ func TestSearch(t *testing.T) {
 	if err != nil {
 		t.Errorf("Video Error")
 	}
-	_, err = vlist.Select()
+	_, err = vlist.Select().IsNijisanji()
 	if err != nil {
 		t.Errorf("Select Error")
 	}
