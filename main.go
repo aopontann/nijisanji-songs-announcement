@@ -27,23 +27,9 @@ func main() {
 		io.WriteString(w, "pong\n")
 	}
 
-	h2 := func(w http.ResponseWriter, _ *http.Request) {
-		log.Info().Str("severity", "ERROR").Msg("error!!!")
-		io.WriteString(w, "error-demo\n")
-	}
-
 	send := func(w http.ResponseWriter, _ *http.Request) {
 		SendMail("test-subject", "test2-message")
 		io.WriteString(w, "send-demo\n")
-	}
-
-	dbPing := func(w http.ResponseWriter, _ *http.Request) {
-		err := DB.Ping()
-		if err != nil {
-			io.WriteString(w, "failed-db-ping\n")
-			return
-		}
-		io.WriteString(w, "success-db-ping\n")
 	}
 
 	tweet := func(w http.ResponseWriter, _ *http.Request) {
@@ -56,26 +42,14 @@ func main() {
 		io.WriteString(w, "success-tweet\n")
 	}
 
-	seed := func(w http.ResponseWriter, _ *http.Request) {
-		err := PlaylistsSeed()
-		if err != nil {
-			io.WriteString(w, "failed-seed\n")
-			return
-		}
-		io.WriteString(w, "success-seed\n")
-	}
-	
 	http.HandleFunc("/tweet", TweetHandler)
 	http.HandleFunc("/item-count", UpdateItemCountHandler) // PUT
 	http.HandleFunc("/check-new-video", CheckNewVideoHAndler) // POST
-	
+
 	// 検証用
 	http.HandleFunc("/ping", h1)
-	http.HandleFunc("/error", h2)
 	http.HandleFunc("/mail", send)
-	http.HandleFunc("/dbping", dbPing)
 	http.HandleFunc("/youtube", YoutubeHandler)
-	http.HandleFunc("/seed", seed)
 	http.HandleFunc("/test/tweet", tweet)
 
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
