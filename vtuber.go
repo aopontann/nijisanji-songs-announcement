@@ -1,26 +1,31 @@
 package main
 
-import "github.com/rs/zerolog/log"
+import (
+	"strings"
+
+	"github.com/rs/zerolog/log"
+)
 
 // プレイリストIDをキーとして動画の数を値とするマップ
 type ItemCountResponse map[string]int64
 
 // チャンネルのアップロードされた動画を含むプレイリストのIDを取得する
 func GetPlaylistsID() ([]string, error) {
-	var pid string
+	var id string
 	var plist[]string
-	rows, err := DB.Query("select playlist_id from vtubers")
+	rows, err := DB.Query("select id from vtubers")
 	if err != nil {
 		log.Error().Str("severity", "ERROR").Str("service", "get-playlists-id").Err(err).Msg("select playlist_id failed")
 		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		err := rows.Scan(&pid)
+		err := rows.Scan(&id)
 		if err != nil {
 			return nil, err
 		}
-		plist = append(plist, pid)
+		rep := strings.Replace(id, "UC", "UU", 1)
+		plist = append(plist, rep)
 	}
 	err = rows.Err()
 	if err != nil {
@@ -29,25 +34,25 @@ func GetPlaylistsID() ([]string, error) {
 	return plist, nil
 }
 
-// DBに保存されているプレイリストIDとプレイリストに含まれている動画の数を取得する
+// DBに保存されているチャンネルIDとプレイリストに含まれている動画の数を取得する
 func GetItemCount() (ItemCountResponse, error) {
 	var (
-		pid string
+		id string
 		count int64
 	)
 	itemCount := ItemCountResponse{}
-	rows, err := DB.Query("select playlist_id, item_count from vtubers")
+	rows, err := DB.Query("select id, item_count from vtubers")
 	if err != nil {
-		log.Error().Str("severity", "ERROR").Str("service", "get-item-count").Err(err).Msg("select playlist_id failed")
+		log.Error().Str("severity", "ERROR").Str("service", "get-item-count").Err(err).Msg("select id, item_count failed")
 		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		err := rows.Scan(&pid, &count)
+		err := rows.Scan(&id, &count)
 		if err != nil {
 			return nil, err
 		}
-		itemCount[pid] = count
+		itemCount[id] = count
 	}
 	err = rows.Err()
 	if err != nil {
