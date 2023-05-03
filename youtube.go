@@ -435,7 +435,7 @@ func (plist YTPRList) Select() (YTPRList, error) {
 	}
 
 	for _, list := range plist {
-		if dblist[list.PlaylistID] != list.ItemCount {
+		if dblist[list.ID] != list.ItemCount {
 			selectedList = append(selectedList, list)
 		}
 	}
