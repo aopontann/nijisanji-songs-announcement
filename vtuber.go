@@ -9,7 +9,8 @@ import (
 // プレイリストIDをキーとして動画の数を値とするマップ
 type ItemCountResponse map[string]int64
 
-// チャンネルのアップロードされた動画を含むプレイリストのIDを取得する
+// DBに保存されている全てのライバーのプレイリストのIDを取得する
+// プレイリストにはアップロードされた動画全てが含まれている
 func GetPlaylistsID() ([]string, error) {
 	var id string
 	var plist[]string
