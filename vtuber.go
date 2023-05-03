@@ -60,3 +60,29 @@ func GetItemCount() (ItemCountResponse, error) {
 	}
 	return itemCount, nil
 }
+
+// にじさんじライバーのチャンネルID一覧を取得する
+func GetChannelIdList() ([]string, error) {
+	var (
+		channelId     string
+		channelIdList []string
+	)
+	rows, err := DB.Query("select id from vtubers")
+	if err != nil {
+		log.Error().Str("severity", "ERROR").Err(err).Msg("select vtuber failed")
+		return channelIdList, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		err := rows.Scan(&channelId)
+		if err != nil {
+			return channelIdList, err
+		}
+		channelIdList = append(channelIdList, channelId)
+	}
+	err = rows.Err()
+	if err != nil {
+		return channelIdList, err
+	}
+	return channelIdList, nil
+}
