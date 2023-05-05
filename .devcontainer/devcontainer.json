@@ -8,10 +8,9 @@
 		"vscode": {
 			"extensions": [
 				"golang.go",
-				"GitHub.vscode-pull-request-github",
 				"MS-CEINTL.vscode-language-pack-ja",
-				"GitHub.copilot",
-				"eamodio.gitlens"
+				"eamodio.gitlens",
+				"AmazonWebServices.aws-toolkit-vscode"
 			]
 		}
 	},

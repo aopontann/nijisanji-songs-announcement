@@ -30,7 +30,7 @@ func YoutubeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ysr, err := yvr.Select()
+	ysr, err := yvr.Select().IsNijisanji()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
@@ -47,86 +47,107 @@ func YoutubeHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Youtube OK"))
 }
 
-func UpdateVideoCountHandler(w http.ResponseWriter, r *http.Request) {
-	chList, err := Channels()
+func UpdateItemCountHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		w.Write([]byte("PUTだけだよ"))
+		return
+	}
+	plist, err := Playlists()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
-	err = chList.Save()
+	err = plist.Save()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
-	w.Write([]byte("Youtube Channels OK"))
+	w.Write([]byte("update ItemCount OK"))
 }
 
-func CheckNewUploadHandler(w http.ResponseWriter, r *http.Request) {
-	chList, err := Channels()
+func CheckNewVideoHAndler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		w.Write([]byte("POSTだけだよ"))
+		return
+	}
+
+	plist, err := Playlists()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 
-	newVideoList, err := chList.CheckUpload()
+	slist, err := plist.Select()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 
-	vid, err := newVideoList.GetNewVideoId()
+	vid, err := slist.Items()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 
-	yvr, err := vid.Video()
+	vlist, err := vid.Video()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 
-	ysr, err := yvr.Select()
+	vlist, err = vlist.Select().IsNijisanji()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 
-	if os.Getenv("ENV") != "dev" {
-		for _, v := range ysr {
-			err := SendMail("新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID))
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(err.Error()))
-				return
-			}
+	vlist, err = vlist.NotExist()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	for _, v := range vlist {
+		var err error
+		if os.Getenv("ENV") == "dev" {
+			err = SendMail("【開発用】新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.Id))
+		} else {
+			err = SendMail("新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.Id))
+		}
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+			return
 		}
 	}
 
-	err = ysr.Save()
+	err = vlist.Save()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
 
-	err = chList.Save()
+	err = plist.Save()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
-	w.Write([]byte("checkNewUpload OK"))
+	w.Write([]byte("checkNewVideo OK"))
 }
 
-func TwitterHandler(w http.ResponseWriter, r *http.Request) {
+func TweetHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		w.Write([]byte("POSTだけだよ"))
