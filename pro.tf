@@ -12,7 +12,7 @@ resource "google_cloud_scheduler_job" "nsa_bot_pro_tweet" {
 
   http_target {
     http_method = "POST"
-    uri         = "${var.cloud_run_service_url_pro}/twitter"
+    uri         = "${var.cloud_run_service_url_pro}/tweet"
   }
 }
 
@@ -29,6 +29,6 @@ resource "google_cloud_scheduler_job" "nsa_bot_pro_check_new_video" {
 
   http_target {
     http_method = "POST"
-    uri         = "${var.cloud_run_service_url_pro}/youtube/checkNewVideo"
+    uri         = "${var.cloud_run_service_url_pro}/check-new-video"
   }
 }
