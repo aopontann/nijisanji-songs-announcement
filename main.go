@@ -2,6 +2,8 @@ package main
 
 import (
 	"os"
+
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
@@ -14,12 +16,24 @@ func main() {
 
 	taskNum := os.Getenv("CLOUD_RUN_TASK_INDEX")
 	if taskNum == "0" {
-		CheckNewVideoTask()
+		err := CheckNewVideoTask()
+		if err != nil {
+			log.Error().Str("severity", "ERROR").Err(err).Send()
+		}
 	}
 	if taskNum == "1" {
-		TweetTask()
+		err := TweetTask()
+		if err != nil {
+			log.Error().Str("severity", "ERROR").Err(err).Send()
+		}
 	} else {
-		CheckNewVideoTask()
-		TweetTask()
+		err := CheckNewVideoTask()
+		if err != nil {
+			log.Error().Str("severity", "ERROR").Err(err).Send()
+		}
+		err = TweetTask()
+		if err != nil {
+			log.Error().Str("severity", "ERROR").Err(err).Send()
+		}
 	}
 }
