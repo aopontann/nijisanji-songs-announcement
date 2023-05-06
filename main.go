@@ -18,22 +18,22 @@ func main() {
 	if taskNum == "0" {
 		err := CheckNewVideoTask()
 		if err != nil {
-			log.Error().Str("severity", "ERROR").Err(err).Send()
+			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
 		}
 	}
 	if taskNum == "1" {
 		err := TweetTask()
 		if err != nil {
-			log.Error().Str("severity", "ERROR").Err(err).Send()
+			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
 		}
 	} else {
 		err := CheckNewVideoTask()
 		if err != nil {
-			log.Error().Str("severity", "ERROR").Err(err).Send()
+			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
 		}
 		err = TweetTask()
 		if err != nil {
-			log.Error().Str("severity", "ERROR").Err(err).Send()
+			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
 		}
 	}
 }
