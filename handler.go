@@ -2,81 +2,54 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
 )
 
-func UpdateItemCountHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPut {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		w.Write([]byte("PUTだけだよ"))
-		return
-	}
+func UpdateItemCountTask() error {
 	plist, err := Playlists()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
+		return err
 	}
 	err = plist.Save()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
+		return err
 	}
-	w.Write([]byte("update ItemCount OK"))
+	return nil
 }
 
-func CheckNewVideoHAndler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		w.Write([]byte("POSTだけだよ"))
-		return
-	}
-
+func CheckNewVideoTask() error {
 	plist, err := Playlists()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
+		return err
 	}
 
 	slist, err := plist.Select()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
+		return err
 	}
 
 	vid, err := slist.Items()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
+		return err
 	}
 
 	vlist, err := vid.Video()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
+		return err
 	}
 
 	vlist, err = vlist.Select().IsNijisanji()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
+		return err
 	}
 
 	vlist, err = vlist.NotExist()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
+		return err
 	}
 
 	for _, v := range vlist {
@@ -87,34 +60,57 @@ func CheckNewVideoHAndler(w http.ResponseWriter, r *http.Request) {
 			err = SendMail("新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.Id))
 		}
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			return
+			return err
 		}
 	}
 
-	err = vlist.Save()
+	tx, err := DB.Begin()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
+		return fmt.Errorf("DB.Begin failed")
 	}
 
-	err = plist.Save()
+	stmt, err := tx.Prepare("INSERT IGNORE INTO videos(id, title, songConfirm, scheduled_start_time) VALUES(?,?,?,?)")
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
+		return fmt.Errorf("tx.Prepare failed")
 	}
-	w.Write([]byte("checkNewVideo OK"))
+	for _, video := range vlist {
+		// "2022-03-28 11:00:00"形式に変換
+		rep1 := strings.Replace(video.LiveStreamingDetails.ScheduledStartTime, "T", " ", 1)
+		scheduledStartTime := strings.Replace(rep1, "Z", "", 1)
+		// DBに動画情報を保存
+		_, err := stmt.Exec(video.Id, video.Snippet.Title, true, scheduledStartTime)
+		if err != nil {
+			if tx.Rollback() != nil {
+				return fmt.Errorf("tx.Rollback() failed")
+			}
+			return fmt.Errorf("stmt.Exec failed")
+		}
+	}
+
+	// 動画が削除されて動画数が減っていても、上書きする
+	stmt, err = tx.Prepare("UPDATE vtubers SET item_count = ? WHERE id = ? AND item_count != ?")
+	if err != nil {
+		return err
+	}
+	for _, list := range plist {
+		_, err := stmt.Exec(list.ItemCount, list.ID, list.ItemCount)
+		if err != nil {
+			if tx.Rollback() != nil {
+				return fmt.Errorf("tx.Rollback() failed")
+			}
+			return fmt.Errorf("stmt.Exec failed")
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func TweetHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		w.Write([]byte("POSTだけだよ"))
-		return
-	}
+func TweetTask() error {
 	dtAfter := time.Now().UTC().Add(1 * time.Second).Format("2006-01-02 15:04:05")
 	dtBefore := time.Now().UTC().Add(5 * time.Minute).Format("2006-01-02 15:04:00")
 
@@ -122,28 +118,22 @@ func TweetHandler(w http.ResponseWriter, r *http.Request) {
 
 	videoList, err := GetVideos(dtAfter, dtBefore)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
+		return err
 	}
 
 	for _, video := range videoList {
 		// changed, err := yt.CheckVideo(video.Id)
 		log.Info().Str("severity", "INFO").Str("service", "tweet").Str("id", video.ID).Str("title", video.Title).Send()
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			return
+			return err
 		}
 		// if changed {
 		// 	continue
 		// }
 		err = video.Tweets()
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			return
+			return err
 		}
 	}
-	w.Write([]byte("Twitter OK"))
+	return nil
 }
