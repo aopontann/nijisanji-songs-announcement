@@ -22,9 +22,12 @@ func main() {
 		}
 	}
 	if taskNum == "1" {
-		err := TweetTask()
-		if err != nil {
-			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
+		// 開発環境ではツイートを行わない
+		if os.Getenv("ENV") != "dev" {
+			err := TweetTask()
+			if err != nil {
+				log.Fatal().Str("severity", "ERROR").Msg(err.Error())
+			}
 		}
 	} else {
 		err := CheckNewVideoTask()
