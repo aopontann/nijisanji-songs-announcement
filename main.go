@@ -49,7 +49,6 @@ func main() {
 	// 検証用
 	http.HandleFunc("/ping", h1)
 	http.HandleFunc("/mail", send)
-	http.HandleFunc("/youtube", YoutubeHandler)
 	http.HandleFunc("/test/tweet", tweet)
 
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
