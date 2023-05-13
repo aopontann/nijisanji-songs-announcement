@@ -8,9 +8,7 @@
 		"vscode": {
 			"extensions": [
 				"golang.go",
-				"MS-CEINTL.vscode-language-pack-ja",
-				"eamodio.gitlens",
-				"AmazonWebServices.aws-toolkit-vscode"
+				"MS-CEINTL.vscode-language-pack-ja"
 			]
 		}
 	},

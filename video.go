@@ -1,8 +1,6 @@
 package main
 
 import (
-	"database/sql"
-	"errors"
 	"fmt"
 	"regexp"
 
@@ -77,13 +75,13 @@ func (list YTVRList) IsNijisanji() (YTVRList, error) {
 func (list YTVRList) NotExist() (YTVRList, error) {
 	var rlist YTVRList
 	for _, video := range list {
-		err := DB.QueryRow("SELECT id FROM videos WHERE id = ?", video.Id).Scan()
-		if errors.Is(err, sql.ErrNoRows) {
-			rlist = append(rlist, video)
-			continue
-		}
+		var count uint
+		err := DB.QueryRow("SELECT count(*) FROM videos WHERE id = ?", video.Id).Scan(&count)
 		if err != nil {
 			return nil, err
+		}
+		if count == 0 {
+			rlist = append(rlist, video)
 		}
 	}
 	return rlist, nil
