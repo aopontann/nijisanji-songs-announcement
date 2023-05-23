@@ -7,7 +7,67 @@ package db
 
 import (
 	"context"
+	"strings"
+	"time"
 )
+
+const createVideo = `-- name: CreateVideo :exec
+INSERT IGNORE INTO videos(id, title, songConfirm, scheduled_start_time) VALUES(?,?,?,?)
+`
+
+type CreateVideoParams struct {
+	ID                 string
+	Title              string
+	Songconfirm        int32
+	ScheduledStartTime time.Time
+}
+
+func (q *Queries) CreateVideo(ctx context.Context, arg CreateVideoParams) error {
+	_, err := q.db.ExecContext(ctx, createVideo,
+		arg.ID,
+		arg.Title,
+		arg.Songconfirm,
+		arg.ScheduledStartTime,
+	)
+	return err
+}
+
+const existsVideos = `-- name: ExistsVideos :many
+SELECT id FROM videos WHERE id IN (/*SLICE:ids*/?)
+`
+
+func (q *Queries) ExistsVideos(ctx context.Context, ids []string) ([]string, error) {
+	sql := existsVideos
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		sql = strings.Replace(sql, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		sql = strings.Replace(sql, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, sql, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
 
 const listItemCount = `-- name: ListItemCount :many
 SELECT replace(id, 'UC', 'UU') AS id, item_count FROM vtubers
@@ -66,4 +126,46 @@ func (q *Queries) ListPlaylistID(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const listVtuberID = `-- name: ListVtuberID :many
+SELECT id FROM vtubers
+`
+
+func (q *Queries) ListVtuberID(ctx context.Context) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listVtuberID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updatePlaylistItemCount = `-- name: UpdatePlaylistItemCount :exec
+UPDATE vtubers SET item_count = ? WHERE id = ? AND item_count != ?
+`
+
+type UpdatePlaylistItemCountParams struct {
+	ItemCount   int32
+	ID          string
+	ItemCount_2 int32
+}
+
+func (q *Queries) UpdatePlaylistItemCount(ctx context.Context, arg UpdatePlaylistItemCountParams) error {
+	_, err := q.db.ExecContext(ctx, updatePlaylistItemCount, arg.ItemCount, arg.ID, arg.ItemCount_2)
+	return err
 }
