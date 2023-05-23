@@ -1,9 +1,8 @@
 CREATE TABLE `videos` (
 	`id` char(11) NOT NULL,
-	`title` varchar(255),
-	`songConfirm` tinyint unsigned DEFAULT '0',
-	`scheduled_start_time` datetime,
-	`twitter_id` char(19),
+	`title` varchar(255) NOT NULL,
+	`songConfirm` tinyint unsigned NOT NULL DEFAULT '0',
+	`scheduled_start_time` datetime NOT NULL,
 	`created_at` datetime NOT NULL DEFAULT current_timestamp(),
 	`updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
 	PRIMARY KEY (`id`)
