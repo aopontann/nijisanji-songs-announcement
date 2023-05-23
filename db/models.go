@@ -5,16 +5,14 @@
 package db
 
 import (
-	"database/sql"
 	"time"
 )
 
 type Video struct {
 	ID                 string
-	Title              sql.NullString
-	Songconfirm        sql.NullInt32
-	ScheduledStartTime sql.NullTime
-	TwitterID          sql.NullString
+	Title              string
+	Songconfirm        int32
+	ScheduledStartTime time.Time
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 }
