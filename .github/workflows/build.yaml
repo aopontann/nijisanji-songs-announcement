@@ -24,12 +24,15 @@ jobs:
       uses: 'google-github-actions/auth@v1'
       with:
         workload_identity_provider: 'projects/543464497701/locations/global/workloadIdentityPools/cloud-build/github/subject/aopontann/nijisanji-songs-announcement'
-        service_account: 'cloud-build@nsa-bot-dev.iam.gserviceaccount.com'
+        service_account: '${{ secrets.SERVICE_ACCOUNT_DEV }}'
 
     - name: 'Set up Cloud SDK'
       uses: 'google-github-actions/setup-gcloud@v1'
       with:
         version: '>= 363.0.0'
 
-    - name: 'Use gcloud CLI'
-      run: 'gcloud info'
+    - name: 'Set Project ID'
+      run: 'gcloud config set project ${{ secrets.PROJECT_NAME_DEV }}'
+
+    - name: 'Image Build'
+      run: 'gcloud builds submit --pack image=gcr.io/${{ secrets.PROJECT_NAME_DEV }}'
