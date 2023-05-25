@@ -1,0 +1,33 @@
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '**.go'
+      - '.github/workflows/**'
+jobs:
+  job_id:
+    # ...
+
+    # Add "id-token" with the intended permissions.
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+    # actions/checkout MUST come before auth
+    - uses: 'actions/checkout@v3'
+
+    - id: 'auth'
+      name: 'Authenticate to Google Cloud'
+      uses: 'google-github-actions/auth@v1'
+      with:
+        workload_identity_provider: 'projects/543464497701/locations/global/workloadIdentityPools/cloud-build/github/subject/aopontann/nijisanji-songs-announcement'
+        service_account: 'cloud-build@nsa-bot-dev.iam.gserviceaccount.com'
+
+    - name: 'Set up Cloud SDK'
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
+
+    - name: 'Use gcloud CLI'
+      run: 'gcloud info'
