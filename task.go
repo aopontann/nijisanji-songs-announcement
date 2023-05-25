@@ -1,104 +1,146 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
+	"github.com/aopontann/nijisanji-songs-announcement/cmd/selection"
+	"github.com/aopontann/nijisanji-songs-announcement/cmd/twitter"
+	"github.com/aopontann/nijisanji-songs-announcement/cmd/youtube"
+	"github.com/aopontann/nijisanji-songs-announcement/cmd/mail"
+	ndb "github.com/aopontann/nijisanji-songs-announcement/db"
 	"github.com/rs/zerolog/log"
 )
 
-func UpdateItemCountTask() error {
-	plist, err := Playlists()
+func UpdateItemCountTask(db *sql.DB) error {
+	yt, err := youtube.New(db)
 	if err != nil {
 		return err
 	}
-	err = plist.Save()
+
+	itemCountList, err := yt.Playlists()
 	if err != nil {
 		return err
+	}
+
+	ctx := context.Background()
+	queries := ndb.New(db)
+
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("DB.Begin failed")
+	}
+	qtx := queries.WithTx(tx)
+
+	// 動画が削除されて動画数が減っていても、上書きする
+	for pid, count := range itemCountList {
+		err = qtx.UpdatePlaylistItemCount(ctx, ndb.UpdatePlaylistItemCountParams{
+			ItemCount:   int32(count),
+			ID:          pid,
+			ItemCount_2: int32(count),
+		})
+		if err != nil {
+			if tx.Rollback() != nil {
+				return fmt.Errorf("tx.Rollback() failed")
+			}
+			return fmt.Errorf("UpdatePlaylistItemCount failed")
+		}
 	}
 	return nil
 }
 
-func CheckNewVideoTask() error {
-	plist, err := Playlists()
+func CheckNewVideoTask(db *sql.DB) error {
+	yt, err := youtube.New(db)
 	if err != nil {
 		return err
 	}
 
-	slist, err := plist.Select()
+	itemCountList, err := yt.Playlists()
 	if err != nil {
 		return err
 	}
 
-	vid, err := slist.Items()
+	pidList, err := yt.CheckItemCount(itemCountList)
 	if err != nil {
 		return err
 	}
 
-	vlist, err := vid.Video()
+	vidList, err := yt.Items(pidList)
 	if err != nil {
 		return err
 	}
 
-	vlist, err = vlist.Select().IsNijisanji()
+	vList, err := yt.Video(vidList)
 	if err != nil {
 		return err
 	}
 
-	vlist, err = vlist.NotExist()
+	selc := selection.New(vList, db)
+
+	selc, err = selc.IsLiveStreaming().IsNotClipped().IsNotLiveFinished().IsUnder10min().IsNijisanji()
 	if err != nil {
 		return err
 	}
+	selc, err = selc.IsNotExists()
+	if err != nil {
+		return err
+	}
+
+	vlist := selc.GetList()
 
 	for _, v := range vlist {
 		var err error
 		if os.Getenv("ENV") == "dev" {
-			err = SendMail("【開発用】新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.Id))
+			err = mail.Send("【開発用】新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.Id))
 		} else {
-			err = SendMail("新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.Id))
+			err = mail.Send("新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.Id))
 		}
 		if err != nil {
 			return err
 		}
 	}
 
-	tx, err := DB.Begin()
+	ctx := context.Background()
+	queries := ndb.New(db)
+
+	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("DB.Begin failed")
 	}
+	qtx := queries.WithTx(tx)
 
-	stmt, err := tx.Prepare("INSERT IGNORE INTO videos(id, title, songConfirm, scheduled_start_time) VALUES(?,?,?,?)")
-	if err != nil {
-		return fmt.Errorf("tx.Prepare failed")
-	}
 	for _, video := range vlist {
-		// "2022-03-28 11:00:00"形式に変換
-		rep1 := strings.Replace(video.LiveStreamingDetails.ScheduledStartTime, "T", " ", 1)
-		scheduledStartTime := strings.Replace(rep1, "Z", "", 1)
+		t, _ := time.Parse(time.RFC3339, video.LiveStreamingDetails.ScheduledStartTime)
 		// DBに動画情報を保存
-		_, err := stmt.Exec(video.Id, video.Snippet.Title, true, scheduledStartTime)
+		err := qtx.CreateVideo(ctx, ndb.CreateVideoParams{
+			ID:                 video.Id,
+			Title:              video.Snippet.Title,
+			Songconfirm:        1,
+			ScheduledStartTime: t,
+		})
 		if err != nil {
 			if tx.Rollback() != nil {
 				return fmt.Errorf("tx.Rollback() failed")
 			}
-			return fmt.Errorf("stmt.Exec failed")
+			return fmt.Errorf("CreateVideo failed")
 		}
 	}
 
 	// 動画が削除されて動画数が減っていても、上書きする
-	stmt, err = tx.Prepare("UPDATE vtubers SET item_count = ? WHERE id = ? AND item_count != ?")
-	if err != nil {
-		return err
-	}
-	for _, list := range plist {
-		_, err := stmt.Exec(list.ItemCount, list.ID, list.ItemCount)
+	for pid, count := range itemCountList {
+		err = qtx.UpdatePlaylistItemCount(ctx, ndb.UpdatePlaylistItemCountParams{
+			ItemCount:   int32(count),
+			ID:          pid,
+			ItemCount_2: int32(count),
+		})
 		if err != nil {
 			if tx.Rollback() != nil {
 				return fmt.Errorf("tx.Rollback() failed")
 			}
-			return fmt.Errorf("stmt.Exec failed")
+			return fmt.Errorf("UpdatePlaylistItemCount failed")
 		}
 	}
 
@@ -110,27 +152,32 @@ func CheckNewVideoTask() error {
 	return nil
 }
 
-func TweetTask() error {
-	dtAfter := time.Now().UTC().Add(1 * time.Second).Format("2006-01-02 15:04:05")
-	dtBefore := time.Now().UTC().Add(5 * time.Minute).Format("2006-01-02 15:04:00")
+func TweetTask(db *sql.DB) error {
+	queries := ndb.New(db)
+	tAfter, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
+	tBefore := tAfter.Add(5 * time.Minute)
 
-	log.Info().Str("severity", "INFO").Str("service", "tweet").Str("datetime", fmt.Sprintf("%s ~ %s\n", dtAfter, dtBefore)).Send()
+	log.Info().Str("severity", "INFO").Str("service", "tweet").Str("datetime", fmt.Sprintf("%v ~ %v\n", tAfter, tBefore)).Send()
 
-	videoList, err := GetVideos(dtAfter, dtBefore)
+	ctx := context.Background()
+	vList, err := queries.ListVideoIdTitle(ctx, ndb.ListVideoIdTitleParams{
+		ScheduledStartTime: tAfter,
+		ScheduledStartTime_2: tBefore,
+	})
 	if err != nil {
 		return err
 	}
 
-	for _, video := range videoList {
+	tw := twitter.New()
+
+	for _, video := range vList {
 		// changed, err := yt.CheckVideo(video.Id)
 		log.Info().Str("severity", "INFO").Str("service", "tweet").Str("id", video.ID).Str("title", video.Title).Send()
 		if err != nil {
 			return err
 		}
-		// if changed {
-		// 	continue
-		// }
-		err = video.Tweets()
+
+		err = tw.Id(video.ID).Title(video.Title).Tweet()
 		if err != nil {
 			return err
 		}
