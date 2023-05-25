@@ -15,3 +15,6 @@ INSERT IGNORE INTO videos(id, title, songConfirm, scheduled_start_time) VALUES(?
 
 -- name: UpdatePlaylistItemCount :exec
 UPDATE vtubers SET item_count = ? WHERE id = ? AND item_count != ?;
+
+-- name: ListVideoIdTitle :many
+SELECT id, title FROM videos WHERE songConfirm = 1 AND scheduled_start_time BETWEEN ? AND ?;
