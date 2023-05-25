@@ -1,0 +1,58 @@
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: nsa-bot
+  labels:
+    cloud.googleapis.com/location: asia-northeast1
+spec:
+  template:
+    spec:
+      taskCount: 2
+      template:
+        spec:
+          containers:
+          - image: gcr.io/nsa-bot-dev/nsa-bot:latest
+            env:
+            - name: ENV
+              value: dev
+            - name: YOUTUBE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: '1'
+                  name: YOUTUBE_API_KEY
+            - name: TWITTER_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: '1'
+                  name: TWITTER_ACCESS_TOKEN
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: '1'
+                  name: SMTP_PASSWORD
+            - name: TWITTER_API_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: '1'
+                  name: TWITTER_API_SECRET_KEY
+            - name: TWITTER_ACCESS_TOKEN_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: '1'
+                  name: TWITTER_ACCESS_TOKEN_SECRET
+            - name: TWITTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: '1'
+                  name: TWITTER_API_KEY
+            - name: DSN
+              valueFrom:
+                secretKeyRef:
+                  key: '1'
+                  name: DSN
+            resources:
+              limits:
+                cpu: 1000m
+                memory: 512Mi
+          maxRetries: 3
+          timeoutSeconds: '600'
