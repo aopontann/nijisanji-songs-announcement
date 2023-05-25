@@ -128,6 +128,43 @@ func (q *Queries) ListPlaylistID(ctx context.Context) ([]string, error) {
 	return items, nil
 }
 
+const listVideoIdTitle = `-- name: ListVideoIdTitle :many
+SELECT id, title FROM videos WHERE songConfirm = 1 AND scheduled_start_time BETWEEN ? AND ?
+`
+
+type ListVideoIdTitleParams struct {
+	ScheduledStartTime   time.Time
+	ScheduledStartTime_2 time.Time
+}
+
+type ListVideoIdTitleRow struct {
+	ID    string
+	Title string
+}
+
+func (q *Queries) ListVideoIdTitle(ctx context.Context, arg ListVideoIdTitleParams) ([]ListVideoIdTitleRow, error) {
+	rows, err := q.db.QueryContext(ctx, listVideoIdTitle, arg.ScheduledStartTime, arg.ScheduledStartTime_2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListVideoIdTitleRow
+	for rows.Next() {
+		var i ListVideoIdTitleRow
+		if err := rows.Scan(&i.ID, &i.Title); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listVtuberID = `-- name: ListVtuberID :many
 SELECT id FROM vtubers
 `
