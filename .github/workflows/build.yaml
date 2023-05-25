@@ -32,4 +32,4 @@ jobs:
         version: '>= 363.0.0'
 
     - name: 'Image Build'
-      run: 'gcloud builds submit --pack image=gcr.io/${{ secrets.PROJECT_NAME_DEV }} --project ${{ secrets.PROJECT_NAME_DEV }}'
+      run: 'gcloud builds submit --pack image=gcr.io/${{ secrets.PROJECT_NAME_DEV }}/nsa-bot --project ${{ secrets.PROJECT_NAME_DEV }}'
