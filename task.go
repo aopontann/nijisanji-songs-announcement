@@ -5,12 +5,13 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/aopontann/nijisanji-songs-announcement/cmd/mail"
 	"github.com/aopontann/nijisanji-songs-announcement/cmd/selection"
 	"github.com/aopontann/nijisanji-songs-announcement/cmd/twitter"
 	"github.com/aopontann/nijisanji-songs-announcement/cmd/youtube"
-	"github.com/aopontann/nijisanji-songs-announcement/cmd/mail"
 	ndb "github.com/aopontann/nijisanji-songs-announcement/db"
 	"github.com/rs/zerolog/log"
 )
@@ -131,9 +132,10 @@ func CheckNewVideoTask(db *sql.DB) error {
 
 	// 動画が削除されて動画数が減っていても、上書きする
 	for pid, count := range itemCountList {
+		cid := strings.Replace(pid, "UU", "UC", 1)
 		err = qtx.UpdatePlaylistItemCount(ctx, ndb.UpdatePlaylistItemCountParams{
 			ItemCount:   int32(count),
-			ID:          pid,
+			ID:          cid,
 			ItemCount_2: int32(count),
 		})
 		if err != nil {

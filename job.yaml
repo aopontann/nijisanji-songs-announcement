@@ -11,7 +11,7 @@ spec:
       template:
         spec:
           containers:
-          - image: gcr.io/nsa-bot-dev/nsa-bot:latest
+          - image: asia-northeast1-docker.pkg.dev/nsa-bot-dev2/buildpacks-docker-repo/nsa-bot:latest
             env:
             - name: ENV
               value: dev
@@ -54,5 +54,6 @@ spec:
               limits:
                 cpu: 1000m
                 memory: 512Mi
-          maxRetries: 3
+          maxRetries: 2
           timeoutSeconds: '600'
+          serviceAccountName: cloud-run-jobs@nsa-bot-dev2.iam.gserviceaccount.com

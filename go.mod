@@ -7,7 +7,7 @@ require (
 	google.golang.org/api v0.73.0
 )
 
-require github.com/dghubble/oauth1 v0.7.2 // indirect
+require github.com/dghubble/oauth1 v0.7.2
 
 require (
 	cloud.google.com/go/compute v1.5.0 // indirect

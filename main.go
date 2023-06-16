@@ -11,8 +11,9 @@ import (
 func main() {
 
 	db, err := sql.Open("mysql", os.Getenv("DSN"))
+	log.Debug().Str("severity", "DEBUG").Str("test",os.Getenv("DSN")[110:]).Send()
 	if err != nil {
-		log.Fatal().Str("severity", "ERROR").Msg(err.Error())
+		log.Fatal().Str("severity", "ERROR").Str("service", "sql.Open").Msg(err.Error())
 	}
 
 	taskNum := os.Getenv("CLOUD_RUN_TASK_INDEX")
