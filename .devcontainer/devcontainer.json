@@ -8,12 +8,12 @@
 		"vscode": {
 			"extensions": [
 				"golang.go",
-				"MS-CEINTL.vscode-language-pack-ja"
+				"MS-CEINTL.vscode-language-pack-ja",
+				"seatonjiang.gitmoji-vscode"
 			]
 		}
 	},
 	"features": {
-		"ghcr.io/devcontainers/features/terraform:1": {},
 		"ghcr.io/dhoeric/features/google-cloud-cli:1": {}
 	}
 
