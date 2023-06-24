@@ -31,25 +31,31 @@ func UpdateItemCountTask(db *sql.DB) error {
 	ctx := context.Background()
 	queries := ndb.New(db)
 
-	tx, err := db.Begin()
-	if err != nil {
-		return fmt.Errorf("DB.Begin failed")
-	}
-	qtx := queries.WithTx(tx)
+	// tx, err := db.Begin()
+	// if err != nil {
+	// 	return fmt.Errorf("DB.Begin failed")
+	// }
+	// qtx := queries.WithTx(tx)
 
 	// 動画が削除されて動画数が減っていても、上書きする
 	for pid, count := range itemCountList {
-		err = qtx.UpdatePlaylistItemCount(ctx, ndb.UpdatePlaylistItemCountParams{
+		err = queries.UpdatePlaylistItemCount(ctx, ndb.UpdatePlaylistItemCountParams{
 			ItemCount:   int32(count),
-			ID:          pid,
+			ID:          strings.Replace(pid, "UU", "UC", 1),
 			ItemCount_2: int32(count),
 		})
 		if err != nil {
-			if tx.Rollback() != nil {
-				return fmt.Errorf("tx.Rollback() failed")
-			}
-			return fmt.Errorf("UpdatePlaylistItemCount failed")
+			// if tx.Rollback() != nil {
+			// 	return fmt.Errorf("tx.Rollback() failed")
+			// }
+			return fmt.Errorf(err.Error())
 		}
+		log.Info().
+			Str("severity", "INFO").
+			Str("service", "db-update-playlist-count").
+			Str("PlaylistId", pid).
+			Int64("ItemCount",count).
+			Send()
 	}
 	return nil
 }
@@ -143,7 +149,7 @@ func CheckNewVideoTask(db *sql.DB) error {
 			if tx.Rollback() != nil {
 				return fmt.Errorf("tx.Rollback() failed")
 			}
-			return fmt.Errorf("UpdatePlaylistItemCount failed")
+			return fmt.Errorf(err.Error())
 		}
 	}
 
