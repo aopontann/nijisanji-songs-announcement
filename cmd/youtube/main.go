@@ -58,6 +58,12 @@ func (yt *Youtube) Playlists() (map[string]int64, error) {
 
 		for _, item := range res.Items {
 			list[item.Id] = item.ContentDetails.ItemCount
+			log.Info().
+				Str("severity", "INFO").
+				Str("service", "youtube-playlists-list").
+				Str("PlaylistId", item.Id).
+				Int64("ItemCount", item.ContentDetails.ItemCount).
+				Send()
 		}
 	}
 	return list, nil
