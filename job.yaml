@@ -50,6 +50,11 @@ spec:
                 secretKeyRef:
                   key: '1'
                   name: DSN
+            - name: MISSKEY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: '1'
+                  name: MISSKEY_TOKEN
             resources:
               limits:
                 cpu: 1000m

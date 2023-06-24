@@ -30,6 +30,9 @@ gcloud secrets create TWITTER_ACCESS_TOKEN \
 gcloud secrets create TWITTER_ACCESS_TOKEN_SECRET \
     --replication-policy="automatic"
 
+gcloud secrets create MISSKEY_TOKEN \
+    --replication-policy="automatic"
+
 # シークレットへのアクセスを許可
 gcloud secrets add-iam-policy-binding DSN \
     --member="serviceAccount:cloud-run-jobs@${PROJECT_ID}.iam.gserviceaccount.com" \
@@ -56,6 +59,10 @@ gcloud secrets add-iam-policy-binding TWITTER_ACCESS_TOKEN \
     --role="roles/secretmanager.secretAccessor"
 
 gcloud secrets add-iam-policy-binding TWITTER_ACCESS_TOKEN_SECRET \
+    --member="serviceAccount:cloud-run-jobs@${PROJECT_ID}.iam.gserviceaccount.com" \
+    --role="roles/secretmanager.secretAccessor"
+
+gcloud secrets add-iam-policy-binding MISSKEY_TOKEN \
     --member="serviceAccount:cloud-run-jobs@${PROJECT_ID}.iam.gserviceaccount.com" \
     --role="roles/secretmanager.secretAccessor"
 
