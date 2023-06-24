@@ -40,5 +40,9 @@ func main() {
 		if err != nil {
 			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
 		}
+		err = TweetTask(db)
+		if err != nil {
+			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
+		}
 	}
 }
