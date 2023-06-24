@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/aopontann/nijisanji-songs-announcement/cmd/mail"
+	"github.com/aopontann/nijisanji-songs-announcement/cmd/misskey"
 	"github.com/aopontann/nijisanji-songs-announcement/cmd/selection"
 	"github.com/aopontann/nijisanji-songs-announcement/cmd/twitter"
 	"github.com/aopontann/nijisanji-songs-announcement/cmd/youtube"
@@ -180,6 +181,34 @@ func TweetTask(db *sql.DB) error {
 		}
 
 		err = tw.Id(video.ID).Title(video.Title).Tweet()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func MisskeyPostTask(db *sql.DB) error {
+	queries := ndb.New(db)
+	tAfter, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
+	tBefore := tAfter.Add(5 * time.Minute)
+
+	log.Info().Str("severity", "INFO").Str("service", "misskey").Str("datetime", fmt.Sprintf("%v ~ %v\n", tAfter, tBefore)).Send()
+
+	ctx := context.Background()
+	vList, err := queries.ListVideoIdTitle(ctx, ndb.ListVideoIdTitleParams{
+		ScheduledStartTime: tAfter,
+		ScheduledStartTime_2: tBefore,
+	})
+	if err != nil {
+		return err
+	}
+
+	mk := misskey.New(os.Getenv("MISSKEY_TOKEN"))
+
+	for _, v := range vList {
+		log.Info().Str("severity", "INFO").Str("service", "tweet").Str("id", v.ID).Str("title", v.Title).Send()
+		err = mk.Post(v.ID, v.Title)
 		if err != nil {
 			return err
 		}
