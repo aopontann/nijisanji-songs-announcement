@@ -31,12 +31,6 @@ func UpdateItemCountTask(db *sql.DB) error {
 	ctx := context.Background()
 	queries := ndb.New(db)
 
-	// tx, err := db.Begin()
-	// if err != nil {
-	// 	return fmt.Errorf("DB.Begin failed")
-	// }
-	// qtx := queries.WithTx(tx)
-
 	// 動画が削除されて動画数が減っていても、上書きする
 	for pid, count := range itemCountList {
 		err = queries.UpdatePlaylistItemCount(ctx, ndb.UpdatePlaylistItemCountParams{
@@ -45,9 +39,6 @@ func UpdateItemCountTask(db *sql.DB) error {
 			ItemCount_2: int32(count),
 		})
 		if err != nil {
-			// if tx.Rollback() != nil {
-			// 	return fmt.Errorf("tx.Rollback() failed")
-			// }
 			return fmt.Errorf(err.Error())
 		}
 		log.Info().
@@ -114,25 +105,16 @@ func CheckNewVideoTask(db *sql.DB) error {
 	ctx := context.Background()
 	queries := ndb.New(db)
 
-	tx, err := db.Begin()
-	if err != nil {
-		return fmt.Errorf("DB.Begin failed")
-	}
-	qtx := queries.WithTx(tx)
-
 	for _, video := range vlist {
 		t, _ := time.Parse(time.RFC3339, video.LiveStreamingDetails.ScheduledStartTime)
 		// DBに動画情報を保存
-		err := qtx.CreateVideo(ctx, ndb.CreateVideoParams{
+		err := queries.CreateVideo(ctx, ndb.CreateVideoParams{
 			ID:                 video.Id,
 			Title:              video.Snippet.Title,
 			Songconfirm:        1,
 			ScheduledStartTime: t,
 		})
 		if err != nil {
-			if tx.Rollback() != nil {
-				return fmt.Errorf("tx.Rollback() failed")
-			}
 			return fmt.Errorf("CreateVideo failed")
 		}
 	}
@@ -140,22 +122,14 @@ func CheckNewVideoTask(db *sql.DB) error {
 	// 動画が削除されて動画数が減っていても、上書きする
 	for pid, count := range itemCountList {
 		cid := strings.Replace(pid, "UU", "UC", 1)
-		err = qtx.UpdatePlaylistItemCount(ctx, ndb.UpdatePlaylistItemCountParams{
+		err = queries.UpdatePlaylistItemCount(ctx, ndb.UpdatePlaylistItemCountParams{
 			ItemCount:   int32(count),
 			ID:          cid,
 			ItemCount_2: int32(count),
 		})
 		if err != nil {
-			if tx.Rollback() != nil {
-				return fmt.Errorf("tx.Rollback() failed")
-			}
 			return fmt.Errorf(err.Error())
 		}
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return err
 	}
 
 	return nil
