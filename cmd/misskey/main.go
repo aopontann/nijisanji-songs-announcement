@@ -24,7 +24,12 @@ func New(token string) *Misskey {
 }
 
 func (m *Misskey) Post(id string, title string) error {
-	content := fmt.Sprintf(`{"text": "【5分後に公開】\n\n%s\n\nhttps://www.youtube.com/watch?v=%s"}`, title, id)
+	content := fmt.Sprintf(`
+	【5分後に公開】
+	%s
+	https://www.youtube.com/watch?v=%s
+	`, title, id)
+
 	resb := ReqBody{
 		I:      m.token,
 		Text:   content,
