@@ -26,7 +26,7 @@ func main() {
 	if taskNum == "1" {
 		// 開発環境ではツイートを行わない
 		if os.Getenv("ENV") != "dev" {
-			err := TweetTask(db)
+			err := MisskeyPostTask(db)
 			if err != nil {
 				log.Fatal().Str("severity", "ERROR").Msg(err.Error())
 			}
@@ -36,7 +36,7 @@ func main() {
 		if err != nil {
 			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
 		}
-		err = TweetTask(db)
+		err = MisskeyPostTask(db)
 		if err != nil {
 			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
 		}
