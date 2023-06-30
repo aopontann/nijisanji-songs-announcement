@@ -137,8 +137,9 @@ func CheckNewVideoTask(db *sql.DB) error {
 
 func TweetTask(db *sql.DB) error {
 	queries := ndb.New(db)
-	tAfter, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
-	tBefore := tAfter.Add(5 * time.Minute)
+	now, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
+	tAfter := now.Add(1 * time.Second)
+	tBefore := now.Add(5 * time.Minute)
 
 	log.Info().Str("severity", "INFO").Str("service", "tweet").Str("datetime", fmt.Sprintf("%v ~ %v\n", tAfter, tBefore)).Send()
 
@@ -170,8 +171,9 @@ func TweetTask(db *sql.DB) error {
 
 func MisskeyPostTask(db *sql.DB) error {
 	queries := ndb.New(db)
-	tAfter, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
-	tBefore := tAfter.Add(5 * time.Minute)
+	now, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
+	tAfter := now.Add(1 * time.Second)
+	tBefore := now.Add(5 * time.Minute)
 
 	log.Info().Str("severity", "INFO").Str("service", "misskey").Str("datetime", fmt.Sprintf("%v ~ %v\n", tAfter, tBefore)).Send()
 
