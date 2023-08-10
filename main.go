@@ -4,14 +4,13 @@ import (
 	"database/sql"
 	"os"
 
-	"github.com/rs/zerolog/log"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
 
 	db, err := sql.Open("mysql", os.Getenv("DSN"))
-	log.Debug().Str("severity", "DEBUG").Str("test",os.Getenv("DSN")[110:]).Send()
 	if err != nil {
 		log.Fatal().Str("severity", "ERROR").Str("service", "sql.Open").Msg(err.Error())
 	}
@@ -30,19 +29,6 @@ func main() {
 			if err != nil {
 				log.Fatal().Str("severity", "ERROR").Msg(err.Error())
 			}
-		}
-	} else {
-		err := CheckNewVideoTask(db)
-		if err != nil {
-			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
-		}
-		err = MisskeyPostTask(db)
-		if err != nil {
-			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
-		}
-		err = TweetTask(db)
-		if err != nil {
-			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
 		}
 	}
 }
