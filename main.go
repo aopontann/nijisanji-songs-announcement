@@ -23,12 +23,13 @@ func main() {
 		}
 	}
 	if taskNum == "1" {
-		// 開発環境ではツイートを行わない
-		if os.Getenv("ENV") != "dev" {
-			err := MisskeyPostTask(db)
-			if err != nil {
-				log.Fatal().Str("severity", "ERROR").Msg(err.Error())
-			}
+		err := MisskeyPostTask(db)
+		if err != nil {
+			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
+		}
+		err = TweetTask(db)
+		if err != nil {
+			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
 		}
 	}
 }
