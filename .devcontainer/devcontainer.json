@@ -9,13 +9,11 @@
 			"extensions": [
 				"golang.go",
 				"MS-CEINTL.vscode-language-pack-ja",
-				"eamodio.gitlens",
-				"AmazonWebServices.aws-toolkit-vscode"
+				"seatonjiang.gitmoji-vscode"
 			]
 		}
 	},
 	"features": {
-		"ghcr.io/devcontainers/features/terraform:1": {},
 		"ghcr.io/dhoeric/features/google-cloud-cli:1": {}
 	}
 
