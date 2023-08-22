@@ -15,21 +15,16 @@ func main() {
 		log.Fatal().Str("severity", "ERROR").Str("service", "sql.Open").Msg(err.Error())
 	}
 
-	taskNum := os.Getenv("CLOUD_RUN_TASK_INDEX")
-	if taskNum == "0" {
-		err := CheckNewVideoTask(db)
-		if err != nil {
-			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
-		}
+	err = CheckNewVideoTask(db)
+	if err != nil {
+		log.Fatal().Str("severity", "ERROR").Msg(err.Error())
 	}
-	if taskNum == "1" {
-		err := MisskeyPostTask(db)
-		if err != nil {
-			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
-		}
-		err = TweetTask(db)
-		if err != nil {
-			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
-		}
+	err = MisskeyPostTask(db)
+	if err != nil {
+		log.Fatal().Str("severity", "ERROR").Msg(err.Error())
+	}
+	err = TweetTask(db)
+	if err != nil {
+		log.Fatal().Str("severity", "ERROR").Msg(err.Error())
 	}
 }
