@@ -29,13 +29,16 @@ func myHTTPFunction(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal().Str("severity", "ERROR").Msg(err.Error())
 	}
-	err = MisskeyPostTask(db)
-	if err != nil {
-		log.Fatal().Str("severity", "ERROR").Msg(err.Error())
-	}
-	err = TweetTask(db)
-	if err != nil {
-		log.Fatal().Str("severity", "ERROR").Msg(err.Error())
+
+	if os.Getenv("ENV") != "dev" {
+		err = MisskeyPostTask(db)
+		if err != nil {
+			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
+		}
+		err = TweetTask(db)
+		if err != nil {
+			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
+		}
 	}
 
 	// Send an HTTP response
