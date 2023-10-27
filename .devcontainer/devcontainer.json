@@ -3,16 +3,7 @@
 {
 	"name": "Go",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/go:0-1.20",
-	"customizations": {
-		"vscode": {
-			"extensions": [
-				"golang.go",
-				"MS-CEINTL.vscode-language-pack-ja",
-				"seatonjiang.gitmoji-vscode"
-			]
-		}
-	},
+	"image": "mcr.microsoft.com/devcontainers/go:1-1.21-bullseye",
 	"features": {
 		"ghcr.io/dhoeric/features/google-cloud-cli:1": {}
 	}
