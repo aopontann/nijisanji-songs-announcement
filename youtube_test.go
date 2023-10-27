@@ -1,12 +1,10 @@
-package main_test
+package main
 
 import (
 	"database/sql"
 	"fmt"
 	"os"
 	"testing"
-
-	"github.com/aopontann/nijisanji-songs-announcement"
 )
 
 func TestSearch(t *testing.T) {
@@ -15,7 +13,7 @@ func TestSearch(t *testing.T) {
 		t.Errorf("sql.Open")
 	}
 
-	yt, err := main.NewYoutube(db)
+	yt, err := NewYoutube(db)
 	if err != nil {
 		t.Errorf("youtube.New(queries)")
 	}
@@ -35,7 +33,7 @@ func TestItems(t *testing.T) {
 		t.Errorf("sql.Open")
 	}
 
-	yt, err := main.NewYoutube(db)
+	yt, err := NewYoutube(db)
 	if err != nil {
 		t.Errorf("youtube.New(queries)")
 	}

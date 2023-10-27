@@ -1,4 +1,4 @@
-package main_test
+package main
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aopontann/nijisanji-songs-announcement"
 	ndb "github.com/aopontann/nijisanji-songs-announcement/db"
 )
 
@@ -18,12 +17,12 @@ func TestIsNijisanji(t *testing.T) {
 		t.Errorf("sql.Open")
 	}
 
-	yt, err := main.NewYoutube(db)
+	yt, err := NewYoutube(db)
 	if err != nil {
 		t.Errorf("youtube.New(queries)")
 	}
 	vList, err := yt.Video([]string{"Grs5sJ6DlnI", "Nr7XM4187H4"})
-	v := main.NewSelect(vList, db)
+	v := NewSelect(vList, db)
 	if err != nil {
 		t.Errorf("video.New(vList, queries)")
 	}
@@ -45,12 +44,12 @@ func TestNotExists(t *testing.T) {
 		t.Errorf("sql.Open")
 	}
 
-	yt, err := main.NewYoutube(db)
+	yt, err := NewYoutube(db)
 	if err != nil {
 		t.Errorf("youtube.New(queries)")
 	}
 	vList, err := yt.Video([]string{"Grs5sJ6DlnI", "G8yMXxscPFg"})
-	v := main.NewSelect(vList, db)
+	v := NewSelect(vList, db)
 	if err != nil {
 		t.Errorf("video.New(vList, queries)")
 	}
