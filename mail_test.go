@@ -1,13 +1,11 @@
-package main_test
+package main
 
 import (
 	"testing"
-
-	"github.com/aopontann/nijisanji-songs-announcement"
 )
 
 func TestSendMail(t *testing.T) {
-	err := main.SendMail("subject", "title")
+	err := SendMail("subject", "title")
 	if err != nil {
 		t.Errorf("sql.Open")
 	}
