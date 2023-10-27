@@ -39,6 +39,11 @@ func myHTTPFunction(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
 		}
+	} else {
+		err = MailSendTask(db)
+		if err != nil {
+			log.Fatal().Str("severity", "ERROR").Msg(err.Error())
+		}
 	}
 
 	// Send an HTTP response

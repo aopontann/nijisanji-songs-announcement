@@ -192,3 +192,34 @@ func MisskeyPostTask(db *sql.DB) error {
 	}
 	return nil
 }
+
+func MailSendTask(db *sql.DB) error {
+	queries := ndb.New(db)
+	now, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
+	tAfter := now.Add(1 * time.Second)
+	tBefore := now.Add(5 * time.Minute)
+
+	log.Info().Str("severity", "INFO").Str("service", "misskey").Str("datetime", fmt.Sprintf("%v ~ %v\n", tAfter, tBefore)).Send()
+
+	ctx := context.Background()
+	vList, err := queries.ListVideoIdTitle(ctx, ndb.ListVideoIdTitleParams{
+		ScheduledStartTime:   tAfter,
+		ScheduledStartTime_2: tBefore,
+	})
+	if err != nil {
+		return err
+	}
+
+	for _, v := range vList {
+		log.Info().Str("severity", "INFO").Str("service", "tweet").Str("id", v.ID).Str("title", v.Title).Send()
+		content := fmt.Sprintf(`
+		%s
+		https://www.youtube.com/watch?v=%s
+		`, v.Title, v.ID)
+		err = SendMail("5分後に公開", content)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
