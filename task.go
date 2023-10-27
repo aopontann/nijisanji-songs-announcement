@@ -8,17 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aopontann/nijisanji-songs-announcement/cmd/mail"
-	"github.com/aopontann/nijisanji-songs-announcement/cmd/misskey"
-	"github.com/aopontann/nijisanji-songs-announcement/cmd/selection"
-	"github.com/aopontann/nijisanji-songs-announcement/cmd/twitter"
-	"github.com/aopontann/nijisanji-songs-announcement/cmd/youtube"
 	ndb "github.com/aopontann/nijisanji-songs-announcement/db"
 	"github.com/rs/zerolog/log"
 )
 
 func UpdateItemCountTask(db *sql.DB) error {
-	yt, err := youtube.New(db)
+	yt, err := NewYoutube(db)
 	if err != nil {
 		return err
 	}
@@ -45,14 +40,14 @@ func UpdateItemCountTask(db *sql.DB) error {
 			Str("severity", "INFO").
 			Str("service", "db-update-playlist-count").
 			Str("PlaylistId", pid).
-			Int64("ItemCount",count).
+			Int64("ItemCount", count).
 			Send()
 	}
 	return nil
 }
 
 func CheckNewVideoTask(db *sql.DB) error {
-	yt, err := youtube.New(db)
+	yt, err := NewYoutube(db)
 	if err != nil {
 		return err
 	}
@@ -77,7 +72,7 @@ func CheckNewVideoTask(db *sql.DB) error {
 		return err
 	}
 
-	selc := selection.New(vList, db)
+	selc := NewSelect(vList, db)
 
 	selc, err = selc.IsLiveStreaming().IsNotClipped().IsNotLiveFinished().IsUnder10min().IsNijisanji()
 	if err != nil {
@@ -93,9 +88,9 @@ func CheckNewVideoTask(db *sql.DB) error {
 	for _, v := range vlist {
 		var err error
 		if os.Getenv("ENV") == "dev" {
-			err = mail.Send("【開発用】新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.Id))
+			err = SendMail("【開発用】新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.Id))
 		} else {
-			err = mail.Send("新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.Id))
+			err = SendMail("新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.Id))
 		}
 		if err != nil {
 			return err
@@ -145,14 +140,14 @@ func TweetTask(db *sql.DB) error {
 
 	ctx := context.Background()
 	vList, err := queries.ListVideoIdTitle(ctx, ndb.ListVideoIdTitleParams{
-		ScheduledStartTime: tAfter,
+		ScheduledStartTime:   tAfter,
 		ScheduledStartTime_2: tBefore,
 	})
 	if err != nil {
 		return err
 	}
 
-	tw := twitter.New()
+	tw := NewTwitter()
 
 	for _, video := range vList {
 		// changed, err := yt.CheckVideo(video.Id)
@@ -179,14 +174,14 @@ func MisskeyPostTask(db *sql.DB) error {
 
 	ctx := context.Background()
 	vList, err := queries.ListVideoIdTitle(ctx, ndb.ListVideoIdTitleParams{
-		ScheduledStartTime: tAfter,
+		ScheduledStartTime:   tAfter,
 		ScheduledStartTime_2: tBefore,
 	})
 	if err != nil {
 		return err
 	}
 
-	mk := misskey.New(os.Getenv("MISSKEY_TOKEN"))
+	mk := NewMisskey(os.Getenv("MISSKEY_TOKEN"))
 
 	for _, v := range vList {
 		log.Info().Str("severity", "INFO").Str("service", "tweet").Str("id", v.ID).Str("title", v.Title).Send()

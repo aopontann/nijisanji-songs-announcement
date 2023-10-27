@@ -1,4 +1,4 @@
-package youtube_test
+package main_test
 
 import (
 	"database/sql"
@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/aopontann/nijisanji-songs-announcement/cmd/youtube"
+	"github.com/aopontann/nijisanji-songs-announcement"
 )
 
 func TestSearch(t *testing.T) {
@@ -15,7 +15,7 @@ func TestSearch(t *testing.T) {
 		t.Errorf("sql.Open")
 	}
 
-	yt, err := youtube.New(db)
+	yt, err := main.NewYoutube(db)
 	if err != nil {
 		t.Errorf("youtube.New(queries)")
 	}
@@ -35,7 +35,7 @@ func TestItems(t *testing.T) {
 		t.Errorf("sql.Open")
 	}
 
-	yt, err := youtube.New(db)
+	yt, err := main.NewYoutube(db)
 	if err != nil {
 		t.Errorf("youtube.New(queries)")
 	}

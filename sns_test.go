@@ -1,15 +1,15 @@
-package twitter_test
+package main_test
 
 import (
 	"testing"
-
-	"github.com/aopontann/nijisanji-songs-announcement/cmd/twitter"
+	"github.com/aopontann/nijisanji-songs-announcement"
 )
 
 func TestTweet(t *testing.T) {
-	tw := twitter.New()
+	tw := main.NewTwitter()
 	err := tw.Id("test").Title("title").Tweet()
 	if err != nil {
 		t.Errorf("Tweets Error")
 	}
 }
+

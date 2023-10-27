@@ -1,4 +1,4 @@
-package mail
+package main
 
 import (
 	"net/smtp"
@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func Send(subject string, message string) error {
+func SendMail(subject string, message string) error {
 	auth := smtp.PlainAuth(
 		"",
 		"aopontan0416@gmail.com",   // 送信に使うアカウント
