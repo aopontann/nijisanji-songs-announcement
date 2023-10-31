@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -12,16 +12,19 @@ import (
 	"github.com/dghubble/oauth1"
 )
 
+// Misskey関連の機能のレシーバを登録する構造体
 type Misskey struct {
 	token string
 }
 
+// misskey投稿するときのリクエストボディの構造体
 type ReqBody struct {
 	I      string `json:"i"`
 	Text   string `json:"text"`
 	Detail bool   `json:"detail"`
 }
 
+// Twitter関連の機能のレシーバを登録する構造体
 type Twitter struct {
 	vid   string
 	title string
@@ -57,7 +60,7 @@ func (tw *Twitter) Tweet() error {
 		return err
 	}
 	defer resp.Body.Close()
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 	fmt.Printf("Raw Response Body:\n%v\n", string(body))
 	return nil
 }
@@ -66,6 +69,7 @@ func NewMisskey(token string) *Misskey {
 	return &Misskey{token: token}
 }
 
+// misskey に投稿する
 func (m *Misskey) Post(id string, title string) error {
 	url := "https://@aopontan@misskey.io/api/notes/create"
 	content := fmt.Sprintf(`
