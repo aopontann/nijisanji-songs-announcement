@@ -6,6 +6,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/rs/zerolog/log"
+	nsa "github.com/aopontann/nijisanji-songs-announcement"
 )
 
 func main() {
@@ -15,15 +16,15 @@ func main() {
 		log.Fatal().Str("severity", "ERROR").Str("service", "sql.Open").Msg(err.Error())
 	}
 
-	err = CheckNewVideoTask(db)
+	err = nsa.CheckNewVideoTask(db)
 	if err != nil {
 		log.Fatal().Str("severity", "ERROR").Msg(err.Error())
 	}
-	err = MisskeyPostTask(db)
+	err = nsa.MisskeyPostTask(db)
 	if err != nil {
 		log.Fatal().Str("severity", "ERROR").Msg(err.Error())
 	}
-	err = TweetTask(db)
+	err = nsa.TweetTask(db)
 	if err != nil {
 		log.Fatal().Str("severity", "ERROR").Msg(err.Error())
 	}

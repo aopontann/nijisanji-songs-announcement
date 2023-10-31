@@ -1,4 +1,4 @@
-package selection
+package nsa
 
 import (
 	"context"
@@ -18,7 +18,7 @@ type Video struct {
 
 type VideoList map[string]youtube.Video
 
-func New(vList []youtube.Video, db *sql.DB) *Video {
+func NewSelect(vList []youtube.Video, db *sql.DB) *Video {
 	m := make(map[string]youtube.Video, 1500)
 	for _, v := range vList {
 		m[v.Id] = v

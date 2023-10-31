@@ -1,4 +1,4 @@
-package youtube
+package nsa
 
 import (
 	"context"
@@ -17,7 +17,7 @@ type Youtube struct {
 	queries *ndb.Queries
 }
 
-func New(db *sql.DB) (*Youtube, error) {
+func NewYoutube(db *sql.DB) (*Youtube, error) {
 	ctx := context.Background()
 	s, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
 	if err != nil {

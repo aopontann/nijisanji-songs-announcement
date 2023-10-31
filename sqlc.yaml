@@ -3,5 +3,5 @@ packages:
   - path: "db"
     name: "db"
     engine: "mysql"
-    schema: "schema.sql"
-    queries: "query.sql"
+    schema: "db/schema.sql"
+    queries: "db/query.sql"

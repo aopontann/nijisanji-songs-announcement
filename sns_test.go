@@ -1,13 +1,11 @@
-package twitter_test
+package nsa
 
 import (
 	"testing"
-
-	"github.com/aopontann/nijisanji-songs-announcement/cmd/twitter"
 )
 
 func TestTweet(t *testing.T) {
-	tw := twitter.New()
+	tw := NewTwitter()
 	err := tw.Id("test").Title("title").Tweet()
 	if err != nil {
 		t.Errorf("Tweets Error")

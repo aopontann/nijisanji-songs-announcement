@@ -1,4 +1,4 @@
-package mail
+package nsa
 
 import (
 	"net/smtp"
@@ -7,10 +7,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func Send(subject string, message string) error {
+func SendMail(subject string, message string) error {
+	addr := os.Getenv("MAIL_ADDRESS")
 	auth := smtp.PlainAuth(
 		"",
-		"aopontan0416@gmail.com",   // 送信に使うアカウント
+		addr,   // 送信に使うアカウント
 		os.Getenv("SMTP_PASSWORD"), // アカウントのパスワード or アプリケーションパスワード
 		"smtp.gmail.com",
 	)
@@ -25,10 +26,10 @@ func Send(subject string, message string) error {
 	return smtp.SendMail(
 		"smtp.gmail.com:587",
 		auth,
-		"aopontan0416@gmail.com",           // 送信元
-		[]string{"aopontan0416@gmail.com"}, // 送信先
+		addr,           // 送信元
+		[]string{addr}, // 送信先
 		[]byte(
-			"To: aopontan0416@gmail.com\r\n"+
+			"To: "+addr+"\r\n"+
 				"Subject:"+subject+"\r\n"+
 				"\r\n"+
 				message+"\r\n"),
