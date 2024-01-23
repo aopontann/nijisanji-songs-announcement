@@ -1,0 +1,55 @@
+# This is a sample workflow to test or replace with your source code.
+#
+# This workflow passes the region where the workflow is deployed
+# to the Wikipedia API and returns a list of related Wikipedia articles.
+# A region is retrieved from the GOOGLE_CLOUD_LOCATION system variable
+# unless you input your own search term; for example, {"searchTerm": "asia"}.
+main:
+  steps:
+    - execute_01:
+        try:
+          call: http.post
+          args:
+            url: https://nsa-bot-4-obtrivirqq-an.a.run.app/check
+            auth:
+              type: OIDC
+          result: channel_list
+        retry:
+          predicate: ${http.default_retry_predicate_non_idempotent}
+          max_retries: 2
+
+    - execute_02:
+        try:
+          call: http.post
+          args:
+            url: https://nsa-bot-4-obtrivirqq-an.a.run.app/video
+            body: ${channel_list.body}
+            auth:
+              type: OIDC
+          result: video_list
+        retry:
+          predicate: ${http.default_retry_predicate_non_idempotent}
+          max_retries: 2
+
+    - execute_03:
+        call: http.post
+        args:
+          url: https://nsa-bot-4-obtrivirqq-an.a.run.app/keyword
+          body: ${video_list.body}
+          auth:
+            type: OIDC
+    
+    - execute_04:
+        try:
+          call: http.post
+          args:
+            url: https://nsa-bot-4-obtrivirqq-an.a.run.app/song
+            auth:
+              type: OIDC
+          result: video_list
+        retry:
+          predicate: ${http.default_retry_predicate_non_idempotent}
+          max_retries: 2
+
+    - finalize:
+        return: ${video_list}

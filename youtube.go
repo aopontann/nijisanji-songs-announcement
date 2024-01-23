@@ -1,106 +1,59 @@
 package nsa
 
 import (
-	"context"
-	"database/sql"
-	"os"
+	"log/slog"
 	"strings"
 
-	ndb "github.com/aopontann/nijisanji-songs-announcement/db"
-	"github.com/rs/zerolog/log"
-	"google.golang.org/api/option"
 	"google.golang.org/api/youtube/v3"
 )
 
-type Youtube struct {
-	service *youtube.Service
-	queries *ndb.Queries
-}
-
-func NewYoutube(db *sql.DB) (*Youtube, error) {
-	ctx := context.Background()
-	s, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
-	if err != nil {
-		log.Fatal().Err(err).Msg("youtube.NewService create failed")
-		return nil, err
-	}
-
-	queries := ndb.New(db)
-
-	return &Youtube{
-		service: s,
-		queries: queries,
-	}, nil
-}
-
-// プレイリストIDとキー、プレイリストに含まれている動画数を値とした連想配列を返す
-func (yt *Youtube) Playlists() (map[string]int64, error) {
-	list := make(map[string]int64, 500)
-	ctx := context.Background()
-	pidList, err := yt.queries.ListPlaylistID(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	for i := 0; i*50 <= len(pidList); i++ {
+// チャンネルIDをキー、プレイリストに含まれている動画数を値とした連想配列を返す
+func CustomPlaylists(yt *youtube.Service, plist []string) (map[string]int64, error) {
+	newlist := make(map[string]int64, 500)
+	for i := 0; i*50 <= len(plist); i++ {
 		var id string
-		if len(pidList) > 50*(i+1) {
-			id = strings.Join(pidList[50*i:50*(i+1)], ",")
+		if len(plist) > 50*(i+1) {
+			id = strings.Join(plist[50*i:50*(i+1)], ",")
 		} else {
-			id = strings.Join(pidList[50*i:], ",")
+			id = strings.Join(plist[50*i:], ",")
 		}
-		call := yt.service.Playlists.List([]string{"snippet", "contentDetails"}).MaxResults(50).Id(id)
+		call := yt.Playlists.List([]string{"snippet", "contentDetails"}).MaxResults(50).Id(id)
 		res, err := call.Do()
 		if err != nil {
-			log.Error().Str("severity", "ERROR").Err(err).Msg("playlists-list call error")
+			slog.Error("playlists-list",
+				slog.String("severity", "ERROR"),
+				slog.String("message", err.Error()),
+			)
 			return nil, err
 		}
 
 		for _, item := range res.Items {
-			list[item.Id] = item.ContentDetails.ItemCount
-			log.Info().
-				Str("severity", "INFO").
-				Str("service", "youtube-playlists-list").
-				Str("PlaylistId", item.Id).
-				Int64("ItemCount", item.ContentDetails.ItemCount).
-				Send()
+			newlist[item.Snippet.ChannelId] = item.ContentDetails.ItemCount
+			slog.Info("youtube-playlists-list",
+				slog.String("severity", "INFO"),
+				slog.String("PlaylistId", item.Id),
+				slog.Int64("ItemCount", item.ContentDetails.ItemCount),
+			)
 		}
 	}
-	return list, nil
+	return newlist, nil
 }
 
-// DBに保存されているプレイリストの動画数とAPIから取得したプレイリストの動画数を比較し、動画数が変わっているプレイリストIDを返す
-func (yt *Youtube) CheckItemCount(list map[string]int64) ([]string, error) {
-	// 動画数が変わっているプレイリストIDを入れる配列
-	var pidList []string
-	ctx := context.Background()
-	itemCountList, err := yt.queries.ListItemCount(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, row := range itemCountList {
-		value, isThere := list[row.ID]
-		if isThere && value != int64(row.ItemCount) {
-			pidList = append(pidList, row.ID)
-		}
-	}
-
-	return pidList, nil
-}
-
-// プレイリストに含まれている動画IDを取得する
-func (yt *Youtube) Items(pidList []string) ([]string, error) {
+func CustomPlaylistItems(yt *youtube.Service, clist []string) ([]string, error) {
 	// 動画IDを格納する文字列型配列を宣言
 	vidList := make([]string, 0, 1500)
 
-	for _, pid := range pidList {
+	for _, cid := range clist {
 		// 取得した動画IDをログに出力するための変数
 		var rid []string
-		call := yt.service.PlaylistItems.List([]string{"snippet"}).PlaylistId(pid).MaxResults(3)
+		pid := strings.Replace(cid, "UC", "UU", 1)
+		call := yt.PlaylistItems.List([]string{"snippet"}).PlaylistId(pid).MaxResults(1)
 		res, err := call.Do()
 		if err != nil {
-			log.Error().Str("severity", "ERROR").Err(err).Msg("playlistitems-list call error")
+			slog.Error("playlistitems-list",
+				slog.String("severity", "ERROR"),
+				slog.String("message", err.Error()),
+			)
 			return []string{}, err
 		}
 
@@ -109,18 +62,17 @@ func (yt *Youtube) Items(pidList []string) ([]string, error) {
 			vidList = append(vidList, item.Snippet.ResourceId.VideoId)
 		}
 
-		log.Info().
-			Str("severity", "INFO").
-			Str("service", "youtube-playlistitems-list").
-			Str("PlaylistId", pid).
-			Strs("videoId", rid).
-			Send()
+		slog.Info("youtube-playlistitems-list",
+			slog.String("severity", "INFO"),
+			slog.String("PlaylistId", pid),
+			slog.String("videoId", strings.Join(rid, ",")),
+		)
 	}
 	return vidList, nil
 }
 
 // Youtube Data API から動画情報を取得
-func (yt *Youtube) Video(vidList []string) ([]youtube.Video, error) {
+func CustomVideo(yt *youtube.Service, vidList []string) ([]youtube.Video, error) {
 	var rlist []youtube.Video
 	for i := 0; i*50 <= len(vidList); i++ {
 		var id string
@@ -129,10 +81,13 @@ func (yt *Youtube) Video(vidList []string) ([]youtube.Video, error) {
 		} else {
 			id = strings.Join(vidList[50*i:], ",")
 		}
-		call := yt.service.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(id).MaxResults(50)
+		call := yt.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(id).MaxResults(50)
 		res, err := call.Do()
 		if err != nil {
-			log.Error().Str("severity", "ERROR").Err(err).Msg("videos-list call error")
+			slog.Error("videos-list",
+				slog.String("severity", "ERROR"),
+				slog.String("message", err.Error()),
+			)
 			return nil, err
 		}
 
@@ -146,15 +101,14 @@ func (yt *Youtube) Video(vidList []string) ([]youtube.Video, error) {
 
 			rlist = append(rlist, *video)
 
-			log.Info().
-				Str("severity", "INFO").
-				Str("service", "youtube-video-list").
-				Str("id", video.Id).
-				Str("title", video.Snippet.Title).
-				Str("duration", video.ContentDetails.Duration).
-				Str("schedule", scheduledStartTime).
-				Str("channel_id", video.Snippet.ChannelId).
-				Send()
+			slog.Info("youtube-video-list",
+				slog.String("severity", "INFO"),
+				slog.String("id", video.Id),
+				slog.String("title", video.Snippet.Title),
+				slog.String("duration", video.ContentDetails.Duration),
+				slog.String("schedule", scheduledStartTime),
+				slog.String("channel_id", video.Snippet.ChannelId),
+			)
 		}
 	}
 	return rlist, nil

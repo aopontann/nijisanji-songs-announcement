@@ -3,223 +3,347 @@ package nsa
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"log/slog"
+	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
-	ndb "github.com/aopontann/nijisanji-songs-announcement/db"
-	"github.com/rs/zerolog/log"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/mysqldialect"
+	"google.golang.org/api/option"
+	"google.golang.org/api/youtube/v3"
 )
 
-func UpdateItemCountTask(db *sql.DB) error {
-	yt, err := NewYoutube(db)
-	if err != nil {
-		return err
-	}
+type Vtuber struct {
+	bun.BaseModel `bun:"table:vtubers"`
 
-	itemCountList, err := yt.Playlists()
-	if err != nil {
-		return err
-	}
-
-	ctx := context.Background()
-	queries := ndb.New(db)
-
-	// 動画が削除されて動画数が減っていても、上書きする
-	for pid, count := range itemCountList {
-		err = queries.UpdatePlaylistItemCount(ctx, ndb.UpdatePlaylistItemCountParams{
-			ItemCount:   int32(count),
-			ID:          strings.Replace(pid, "UU", "UC", 1),
-			ItemCount_2: int32(count),
-		})
-		if err != nil {
-			return fmt.Errorf(err.Error())
-		}
-		log.Info().
-			Str("severity", "INFO").
-			Str("service", "db-update-playlist-count").
-			Str("PlaylistId", pid).
-			Int64("ItemCount", count).
-			Send()
-	}
-	return nil
+	ID        string    `bun:"id,type:varchar(24),pk"`
+	Name      string    `bun:"name,notnull,type:varchar"`
+	ItemCount int64     `bun:"item_count,default:0,type:integer"`
+	CreatedAt time.Time `bun:",nullzero,notnull,default:current_timestamp()"`
+	UpdatedAt time.Time `bun:",nullzero,notnull,default:current_timestamp() ON UPDATE current_timestamp()"`
 }
 
-func CheckNewVideoTask(db *sql.DB) error {
-	yt, err := NewYoutube(db)
+type Video struct {
+	bun.BaseModel `bun:"table:videos"`
+
+	ID        string    `bun:"id,type:varchar(11),pk"`
+	Title     string    `bun:"title,notnull,type:varchar"`
+	Duration  string    `bun:"duration,notnull,type:varchar"` //int型に変換したほうがいいか？
+	Viewers   int64     `bun:"viewers,notnull,type:integer"`
+	Content   string    `bun:"content,notnull,type:varchar"`
+	Announced bool      `bun:"announced,default:false,type:boolean"`
+	StartTime time.Time `bun:"scheduled_start_time,type:timestamp"`
+	CreatedAt time.Time `bun:",nullzero,notnull,default:current_timestamp()"`
+	UpdatedAt time.Time `bun:",nullzero,notnull,default:current_timestamp() ON UPDATE current_timestamp()"`
+}
+
+type ChannelBody struct {
+	CIDList []string `json:"channelId"`
+}
+type VideoBody struct {
+	Vlist []youtube.Video `json:"video_list"`
+}
+
+func Hello(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, "hello!")
+}
+
+func CheckNewVideo(w http.ResponseWriter, r *http.Request) {
+	// 初期化処理
+	sqldb, err := sql.Open("mysql", os.Getenv("DSN"))
 	if err != nil {
-		return err
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	ctx := context.Background()
+	db := bun.NewDB(sqldb, mysqldialect.New())
+	yt, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
+	if err != nil {
+		slog.Error("youtube.NewService",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	itemCountList, err := yt.Playlists()
+	// DBからチャンネルID、チャンネルごとの動画数を取得
+	var ids []string
+	var itemCount []int64
+	err = db.NewSelect().Model((*Vtuber)(nil)).Column("id", "item_count").Scan(ctx, &ids, &itemCount)
 	if err != nil {
-		return err
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	pidList, err := yt.CheckItemCount(itemCountList)
-	if err != nil {
-		return err
+	// プレイリスト一覧と比較用のMAPを作成
+	var plist []string
+	oldList := make(map[string]int64, 500)
+	for i := range ids {
+		oldList[ids[i]] = itemCount[i]
+		pid := strings.Replace(ids[i], "UC", "UU", 1)
+		plist = append(plist, pid)
 	}
 
-	vidList, err := yt.Items(pidList)
+	// チャンネルIDをキー、プレイリストに含まれている動画数を値とした連想配列を返す
+	newlist, err := CustomPlaylists(yt, plist)
 	if err != nil {
-		return err
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	vList, err := yt.Video(vidList)
+	// DBを新しく取得したデータに更新
+	var upIdList []string
+	var upItemCountList []int64
+	for k, v := range newlist {
+		if oldList[k] != v {
+			upIdList = append(upIdList, k)
+			upItemCountList = append(upItemCountList, v)
+		}
+	}
+	// 以下のコメントアウトされたAPIで生成されるSQLではバルクアップデートができなかった(planetscale上)ため、ELT,FIELDを使うようにした
+	// query := db.NewUpdate().Model(&VtuberList).Column("item_count").Bulk()
+	query := db.NewUpdate().Model((*Vtuber)(nil)).
+		Set("item_count = ELT(FIELD(id, ?), ?)", bun.In(upIdList), bun.In(upItemCountList)).
+		Where("id IN (?)", bun.In(upIdList))
+	rawQuery, err := query.AppendQuery(db.Formatter(), nil)
 	if err != nil {
-		return err
+		slog.Error("query.AppendQuery",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	fmt.Println(string(rawQuery))
+
+	_, err = query.Exec(ctx)
+	if err != nil {
+		slog.Error("update-itemCount",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	selc := NewSelect(vList, db)
-
-	selc, err = selc.IsLiveStreaming().IsNotClipped().IsNotLiveFinished().IsUnder10min().IsNijisanji()
-	if err != nil {
-		return err
+	// 新着動画をアップロードしたチャンネルIDリストをレスポンスとして返す
+	var cidList []string
+	for k, v := range newlist {
+		if v > oldList[k] {
+			cidList = append(cidList, k)
+		}
 	}
-	selc, err = selc.IsNotExists()
+	resp := ChannelBody{cidList}
+	bytes, err := json.Marshal(resp)
 	if err != nil {
-		return err
+		slog.Error("json.Marshal",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(bytes)
+}
+
+func SaveVideos(w http.ResponseWriter, r *http.Request) {
+	// 初期化処理
+	sqldb, err := sql.Open("mysql", os.Getenv("DSN"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	ctx := context.Background()
+	db := bun.NewDB(sqldb, mysqldialect.New())
+	yt, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
+	if err != nil {
+		slog.Error("youtube.NewService",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	vlist := selc.GetList()
+	var b ChannelBody
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	// list が空のときにインサートエラーが発生してしまうため、その回避処理
+	if len(b.CIDList) == 0 {
+		resp := VideoBody{[]youtube.Video{}}
+		bytes, _ := json.Marshal(resp)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(bytes)
+		return	
+	}
 
+	vidList, err := CustomPlaylistItems(yt, b.CIDList)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	vlist, err := CustomVideo(yt, vidList)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var Videos []Video
 	for _, v := range vlist {
-		var err error
-		if os.Getenv("ENV") == "dev" {
-			err = SendMail("【開発用】新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.Id))
-		} else {
-			err = SendMail("新しい動画がアップロードされました", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.Id))
+		var Viewers int64
+		Viewers = 0
+		scheduledStartTime := "1998-01-01 15:04:05" // 例 2022-03-28T11:00:00Z
+		if v.LiveStreamingDetails != nil {
+			Viewers = int64(v.LiveStreamingDetails.ConcurrentViewers)
+			// "2022-03-28 11:00:00"形式に変換
+			rep1 := strings.Replace(v.LiveStreamingDetails.ScheduledStartTime, "T", " ", 1)
+			scheduledStartTime = strings.Replace(rep1, "Z", "", 1)
 		}
-		if err != nil {
-			return err
-		}
-	}
-
-	ctx := context.Background()
-	queries := ndb.New(db)
-
-	for _, video := range vlist {
-		t, _ := time.Parse(time.RFC3339, video.LiveStreamingDetails.ScheduledStartTime)
-		// DBに動画情報を保存
-		err := queries.CreateVideo(ctx, ndb.CreateVideoParams{
-			ID:                 video.Id,
-			Title:              video.Snippet.Title,
-			Songconfirm:        1,
-			ScheduledStartTime: t,
+		t, _ := time.Parse("2006-01-02 15:04:05", scheduledStartTime)
+		Videos = append(Videos, Video{
+			ID:        v.Id,
+			Title:     v.Snippet.Title,
+			Duration:  v.ContentDetails.Duration,
+			Content:   v.Snippet.LiveBroadcastContent,
+			Viewers:   Viewers,
+			StartTime: t,
 		})
-		if err != nil {
-			return fmt.Errorf("CreateVideo failed")
-		}
 	}
 
-	// 動画が削除されて動画数が減っていても、上書きする
-	for pid, count := range itemCountList {
-		cid := strings.Replace(pid, "UU", "UC", 1)
-		err = queries.UpdatePlaylistItemCount(ctx, ndb.UpdatePlaylistItemCountParams{
-			ItemCount:   int32(count),
-			ID:          cid,
-			ItemCount_2: int32(count),
-		})
-		if err != nil {
-			return fmt.Errorf(err.Error())
-		}
+	_, err = db.NewInsert().
+		Model(&Videos).
+		Ignore().
+		Exec(ctx)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	return nil
+	resp := VideoBody{vlist}
+	bytes, err := json.Marshal(resp)
+	if err != nil {
+		slog.Error("json.Marshal",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(bytes)
 }
 
-func TweetTask(db *sql.DB) error {
-	queries := ndb.New(db)
+func SongVideoAnnounce(w http.ResponseWriter, r *http.Request) {
+	// 初期化処理
+	sqldb, err := sql.Open("mysql", os.Getenv("DSN"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	ctx := context.Background()
+	db := bun.NewDB(sqldb, mysqldialect.New())
+
 	now, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
 	tAfter := now.Add(1 * time.Second)
 	tBefore := now.Add(5 * time.Minute)
-
-	log.Info().Str("severity", "INFO").Str("service", "tweet").Str("datetime", fmt.Sprintf("%v ~ %v\n", tAfter, tBefore)).Send()
-
-	ctx := context.Background()
-	vList, err := queries.ListVideoIdTitle(ctx, ndb.ListVideoIdTitleParams{
-		ScheduledStartTime:   tAfter,
-		ScheduledStartTime_2: tBefore,
-	})
+	var videos []Video
+	err = db.NewSelect().Model(&videos).Where("? BETWEEN ? AND ?", bun.Ident("scheduled_start_time"), tAfter, tBefore).Scan(ctx)
 	if err != nil {
-		return err
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	tw := NewTwitter()
+	// tw := NewTwitter()
+	// mk := NewMisskey(os.Getenv("MISSKEY_TOKEN"))
 
-	for _, video := range vList {
-		// changed, err := yt.CheckVideo(video.Id)
-		log.Info().Str("severity", "INFO").Str("service", "tweet").Str("id", video.ID).Str("title", video.Title).Send()
+
+	for _, v := range videos {
+		// 放送前の動画か
+		if v.Content != "upcoming" {
+			continue
+		}
+		// 動画の長さが10分未満か
+		if !regexp.MustCompile(`^PT([1-9]M[1-5]?[0-9]S|[1-5]?[0-9]S)`).Match([]byte(v.Duration)) {
+			continue
+		}
+		// 切り抜き動画ではないか
+		if regexp.MustCompile(`.*切り抜き.*`).Match([]byte(v.Title)) {
+			continue
+		}
+		// ショート動画ではないか
+		if regexp.MustCompile(`.*shorts.*`).Match([]byte(v.Title)) {
+			continue
+		}
+		// 試聴動画ではないか
+		if regexp.MustCompile(`.*試聴.*`).Match([]byte(v.Title)) {
+			continue
+		}
+		// filtedVideos = append(filtedVideos, v)
+		err = SendMail("検証 5分後に公開", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID))
 		if err != nil {
-			return err
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 
-		err = tw.Id(video.ID).Title(video.Title).Tweet()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+		// ツイート
+		// err = tw.Id(v.ID).Title(v.Title).Tweet()
+		// if err != nil {
+		// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+		// 	return
+		// }
+
+		// Missky post
+		// err = mk.Post(v.ID, v.Title)
+		// if err != nil {
+		// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+		// 	return
+		// }
+	}	
+	w.Write([]byte("OK!!"))
 }
 
-func MisskeyPostTask(db *sql.DB) error {
-	queries := ndb.New(db)
-	now, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
-	tAfter := now.Add(1 * time.Second)
-	tBefore := now.Add(5 * time.Minute)
-
-	log.Info().Str("severity", "INFO").Str("service", "misskey").Str("datetime", fmt.Sprintf("%v ~ %v\n", tAfter, tBefore)).Send()
-
-	ctx := context.Background()
-	vList, err := queries.ListVideoIdTitle(ctx, ndb.ListVideoIdTitleParams{
-		ScheduledStartTime:   tAfter,
-		ScheduledStartTime_2: tBefore,
-	})
-	if err != nil {
-		return err
+func KeywordAnnounce(w http.ResponseWriter, r *http.Request) {
+	var reqBody VideoBody
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
-
-	mk := NewMisskey(os.Getenv("MISSKEY_TOKEN"))
-
-	for _, v := range vList {
-		log.Info().Str("severity", "INFO").Str("service", "tweet").Str("id", v.ID).Str("title", v.Title).Send()
-		err = mk.Post(v.ID, v.Title)
-		if err != nil {
-			return err
+	for _, v := range reqBody.Vlist {
+		if regexp.MustCompile(`.*Lethal Company.*`).Match([]byte(v.Snippet.Title)) {
+			err := SendMail("Lethal Company やるよ！", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.Id))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 	}
-	return nil
 }
 
-func MailSendTask(db *sql.DB) error {
-	queries := ndb.New(db)
-	now, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
-	tAfter := now.Add(1 * time.Second)
-	tBefore := now.Add(5 * time.Minute)
+// func DeleteVideos(w http.ResponseWriter, r *http.Request) {
+// 	// 初期化処理
+// 	sqldb, err := sql.Open("mysql", os.Getenv("DSN"))
+// 	if err != nil {
+// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+// 		return
+// 	}
+// 	ctx := context.Background()
+// 	db := bun.NewDB(sqldb, mysqldialect.New())
+// 	yt, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
+// 	if err != nil {
+// 		slog.Error("youtube.NewService",
+// 			slog.String("severity", "ERROR"),
+// 			slog.String("message", err.Error()),
+// 		)
+// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+// 		return
+// 	}
+// }
 
-	log.Info().Str("severity", "INFO").Str("service", "misskey").Str("datetime", fmt.Sprintf("%v ~ %v\n", tAfter, tBefore)).Send()
-
-	ctx := context.Background()
-	vList, err := queries.ListVideoIdTitle(ctx, ndb.ListVideoIdTitleParams{
-		ScheduledStartTime:   tAfter,
-		ScheduledStartTime_2: tBefore,
-	})
-	if err != nil {
-		return err
-	}
-
-	for _, v := range vList {
-		log.Info().Str("severity", "INFO").Str("service", "tweet").Str("id", v.ID).Str("title", v.Title).Send()
-		content := fmt.Sprintf(`
-		%s
-		https://www.youtube.com/watch?v=%s
-		`, v.Title, v.ID)
-		err = SendMail("5分後に公開", content)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
