@@ -17,3 +17,9 @@ CREATE TABLE `videos` (
     `created_at` DATETIME NOT NULL DEFAULT current_timestamp(), 
     `updated_at` DATETIME NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(), PRIMARY KEY (`id`)
 );
+
+CREATE TABLE `users` (
+    `token` varchar(200) NOT NULL, 
+    `created_at` DATETIME NOT NULL DEFAULT current_timestamp(), 
+    `updated_at` DATETIME NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(), PRIMARY KEY (`token`)
+);
