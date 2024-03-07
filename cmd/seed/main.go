@@ -3,38 +3,15 @@ package main
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"database/sql"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/mysqldialect"
+
+	nsa "github.com/aopontann/nijisanji-songs-announcement"
 )
-
-type Vtuber struct {
-	bun.BaseModel `bun:"table:vtubers"`
-
-	ID        string    `bun:"id,type:varchar(24),pk"`
-	Name      string    `bun:"name,notnull,type:varchar"`
-	ItemCount int64     `bun:"item_count,default:0,type:integer"`
-	CreatedAt time.Time `bun:",nullzero,notnull,default:current_timestamp()"`
-	UpdatedAt time.Time `bun:",nullzero,notnull,default:current_timestamp() ON UPDATE current_timestamp()"`
-}
-
-type Video struct {
-	bun.BaseModel `bun:"table:videos"`
-
-	ID        string    `bun:"id,type:varchar(11),pk"`
-	Title     string    `bun:"title,notnull,type:varchar"`
-	Duration  string    `bun:"duration,notnull,type:varchar"` //int型に変換したほうがいいか？
-	Viewers   int64     `bun:"viewers,notnull,type:integer"`
-	Content   string    `bun:"content,notnull,type:varchar"`
-	Announced bool      `bun:"announced,default:false,type:boolean"`
-	StartTime time.Time `bun:"scheduled_start_time,type:timestamp"`
-	CreatedAt time.Time `bun:",nullzero,notnull,default:current_timestamp()"`
-	UpdatedAt time.Time `bun:",nullzero,notnull,default:current_timestamp() ON UPDATE current_timestamp()"`
-}
 
 func main() {
 	sqldb, err := sql.Open("mysql", os.Getenv("DSN"))
@@ -57,7 +34,7 @@ func main() {
 	// fmt.Println(ids)
 	// fmt.Println(itemCount)
 
-	query := db.NewCreateTable().Model((*Vtuber)(nil))
+	query := db.NewCreateTable().Model((*nsa.Vtuber)(nil))
 	rawQuery, err := query.AppendQuery(db.Formatter(), nil)
 	if err != nil {
 		panic(err)
@@ -65,7 +42,15 @@ func main() {
 	s := string(rawQuery)
 	fmt.Println(s)
 
-	query = db.NewCreateTable().Model((*Video)(nil))
+	query = db.NewCreateTable().Model((*nsa.Video)(nil))
+	rawQuery, err = query.AppendQuery(db.Formatter(), nil)
+	if err != nil {
+		panic(err)
+	}
+	s = string(rawQuery)
+	fmt.Println(s)
+
+	query = db.NewCreateTable().Model((*nsa.User)(nil))
 	rawQuery, err = query.AppendQuery(db.Formatter(), nil)
 	if err != nil {
 		panic(err)
