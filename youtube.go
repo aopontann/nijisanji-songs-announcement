@@ -29,8 +29,8 @@ func CustomPlaylists(yt *youtube.Service, plist []string) (map[string]int64, err
 
 		for _, item := range res.Items {
 			newlist[item.Snippet.ChannelId] = item.ContentDetails.ItemCount
-			slog.Info("youtube-playlists-list",
-				slog.String("severity", "INFO"),
+			slog.Debug("youtube-playlists-list",
+				slog.String("severity", "DEBUG"),
 				slog.String("PlaylistId", item.Id),
 				slog.Int64("ItemCount", item.ContentDetails.ItemCount),
 			)
@@ -62,8 +62,8 @@ func CustomPlaylistItems(yt *youtube.Service, clist []string) ([]string, error) 
 			vidList = append(vidList, item.Snippet.ResourceId.VideoId)
 		}
 
-		slog.Info("youtube-playlistitems-list",
-			slog.String("severity", "INFO"),
+		slog.Debug("youtube-playlistitems-list",
+			slog.String("severity", "DEBUG"),
 			slog.String("PlaylistId", pid),
 			slog.String("videoId", strings.Join(rid, ",")),
 		)
