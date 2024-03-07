@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	firebase "firebase.google.com/go/v4"
+	"firebase.google.com/go/v4/messaging"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/mysqldialect"
@@ -43,8 +45,23 @@ type Video struct {
 	UpdatedAt time.Time `bun:",nullzero,notnull,default:current_timestamp() ON UPDATE current_timestamp()"`
 }
 
+type User struct {
+	bun.BaseModel `bun:"table:users"`
+
+	Token     string    `bun:"token,type:varchar(200),pk"`
+	CreatedAt time.Time `bun:",nullzero,notnull,default:current_timestamp()"`
+	UpdatedAt time.Time `bun:",nullzero,notnull,default:current_timestamp() ON UPDATE current_timestamp()"`
+}
+
 type ChannelBody struct {
 	CIDList []string `json:"channelId"`
+}
+type UpdatedChannel struct {
+	CID       string `json:"channelId"`
+	ItemCount int64  `json:"item_count"`
+}
+type CheckResBody struct {
+	Data []UpdatedChannel `json:"data"`
 }
 type VideoBody struct {
 	Vlist []youtube.Video `json:"video_list"`
@@ -184,17 +201,25 @@ func SaveVideos(w http.ResponseWriter, r *http.Request) {
 		bytes, _ := json.Marshal(resp)
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(bytes)
-		return	
+		return
 	}
 
 	vidList, err := CustomPlaylistItems(yt, b.CIDList)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("CustomPlaylistItems",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
 		return
 	}
 	vlist, err := CustomVideo(yt, vidList)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("CustomVideo",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
 		return
 	}
 
@@ -226,6 +251,10 @@ func SaveVideos(w http.ResponseWriter, r *http.Request) {
 		Exec(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("NewInsert Videos",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
 		return
 	}
 
@@ -250,6 +279,24 @@ func SongVideoAnnounce(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := context.Background()
 	db := bun.NewDB(sqldb, mysqldialect.New())
+	app, err := firebase.NewApp(ctx, nil)
+	if err != nil {
+		slog.Error("firebase.NewApp error",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	client, err := app.Messaging(ctx)
+	if err != nil {
+		slog.Error("app.Messaging error",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	now, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
 	tAfter := now.Add(1 * time.Second)
@@ -264,6 +311,12 @@ func SongVideoAnnounce(w http.ResponseWriter, r *http.Request) {
 	// tw := NewTwitter()
 	// mk := NewMisskey(os.Getenv("MISSKEY_TOKEN"))
 
+	var tokens []string
+	err = db.NewSelect().Model((*User)(nil)).Column("token").Scan(ctx, &tokens)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	for _, v := range videos {
 		// 放送前の動画か
@@ -286,9 +339,28 @@ func SongVideoAnnounce(w http.ResponseWriter, r *http.Request) {
 		if regexp.MustCompile(`.*試聴.*`).Match([]byte(v.Title)) {
 			continue
 		}
-		// filtedVideos = append(filtedVideos, v)
+
 		err = SendMail("検証 5分後に公開", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID))
 		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// FCM
+		message := &messaging.MulticastMessage{
+			Notification: &messaging.Notification{
+				Title: v.Title,
+				Body:  fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID),
+			},
+			Tokens: tokens,
+		}
+		// 500通まで
+		_, err := client.SendEachForMulticast(ctx, message)
+		if err != nil {
+			slog.Error("SendEachForMulticast error",
+				slog.String("severity", "ERROR"),
+				slog.String("message", err.Error()),
+			)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -306,7 +378,7 @@ func SongVideoAnnounce(w http.ResponseWriter, r *http.Request) {
 		// 	http.Error(w, err.Error(), http.StatusInternalServerError)
 		// 	return
 		// }
-	}	
+	}
 	w.Write([]byte("OK!!"))
 }
 
@@ -346,4 +418,3 @@ func KeywordAnnounce(w http.ResponseWriter, r *http.Request) {
 // 		return
 // 	}
 // }
-
