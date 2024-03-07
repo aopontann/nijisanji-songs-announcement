@@ -7,3 +7,5 @@ atlas.sum
 
 **/.terraform/*
 *.tfvars
+
+node_modules
