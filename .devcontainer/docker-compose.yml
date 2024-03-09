@@ -25,14 +25,20 @@ services:
     # (Adding the "ports" property to this file will not forward from a Codespace.)
 
   db:
-    image: mysql:8.0
+    image: postgres:16
+    restart: always
+    # set shared memory limit when using docker-compose
+    shm_size: 128mb
+    # or set shared memory limit when deploy via swarm stack
+    #volumes:
+    #  - type: tmpfs
+    #    target: /dev/shm
+    #    tmpfs:
+    #      size: 134217728 # 128*2^20 bytes = 128Mb
     environment:
-      MYSQL_ROOT_PASSWORD: password
-      MYSQL_DATABASE: nsa
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysqldb-data:/var/lib/mysql
+      POSTGRES_DB: test_db
+      POSTGRES_PASSWORD: example
+
 
 
     # Add "forwardPorts": ["5432"] to **devcontainer.json** to forward PostgreSQL locally.
