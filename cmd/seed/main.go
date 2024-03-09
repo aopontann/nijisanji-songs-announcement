@@ -2,25 +2,22 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"database/sql"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/mysqldialect"
+	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/uptrace/bun/driver/pgdriver"
 
 	nsa "github.com/aopontann/nijisanji-songs-announcement"
 )
 
 func main() {
-	sqldb, err := sql.Open("mysql", os.Getenv("DSN"))
-	if err != nil {
-		panic(err)
-	}
+	dsn := "postgres://postgres:example@localhost:5432/test_db?sslmode=disable"
+	// dsn := "unix://user:pass@dbname/var/run/postgresql/.s.PGSQL.5432"
+	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
 
-	// ctx := context.Background()
-	db := bun.NewDB(sqldb, mysqldialect.New())
+	db := bun.NewDB(sqldb, pgdialect.New())
 
 	// var ids []string
 	// var itemCount []int64
