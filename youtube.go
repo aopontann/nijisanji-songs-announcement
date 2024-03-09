@@ -3,6 +3,7 @@ package nsa
 import (
 	"log/slog"
 	"strings"
+	"time"
 
 	"google.golang.org/api/youtube/v3"
 )
@@ -47,7 +48,7 @@ func CustomPlaylistItems(yt *youtube.Service, clist []string) ([]string, error) 
 		// 取得した動画IDをログに出力するための変数
 		var rid []string
 		pid := strings.Replace(cid, "UC", "UU", 1)
-		call := yt.PlaylistItems.List([]string{"snippet"}).PlaylistId(pid).MaxResults(1)
+		call := yt.PlaylistItems.List([]string{"snippet"}).PlaylistId(pid).MaxResults(3)
 		res, err := call.Do()
 		if err != nil {
 			slog.Error("playlistitems-list",
@@ -112,4 +113,30 @@ func CustomVideo(yt *youtube.Service, vidList []string) ([]youtube.Video, error)
 		}
 	}
 	return rlist, nil
+}
+
+// 放送前、放送中のプレミア動画、ライプ　普通動画の公開直後の動画に絞る
+func FilterVideo(vlist []youtube.Video) ([]youtube.Video, error) {
+	var filtedVideoList []youtube.Video
+	for _, v := range vlist {
+		// プレミア公開、生放送終了した動画
+		if v.LiveStreamingDetails != nil && v.Snippet.LiveBroadcastContent == "none" {
+			continue
+		}
+
+		// プレミア公開、生放送をする予定、している最中の動画
+		if v.Snippet.LiveBroadcastContent != "none" {
+			filtedVideoList = append(filtedVideoList, v)
+			continue
+		}
+
+		// プレミア公開、生放送ではなく、10分以内に公開された動画
+		t, _ := time.Parse("2006-01-02T15:04:05Z", v.Snippet.PublishedAt)
+		if time.Now().UTC().Add(-10 * time.Minute).Compare(t) < 0 {
+			filtedVideoList = append(filtedVideoList, v)
+			continue
+		}
+	}
+
+	return filtedVideoList, nil
 }
