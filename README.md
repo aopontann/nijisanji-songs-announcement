@@ -22,3 +22,5 @@ atlas schema apply \
 ```
 gcloud builds submit --pack image=asia-northeast1-docker.pkg.dev/${PROJECT_ID}/buildpacks-docker-repo/nsa-bot,env=GOOGLE_BUILDABLE="cmd/api/main.go"
 ```
+
+export GOOGLE_APPLICATION_CREDENTIALS="token.json"
