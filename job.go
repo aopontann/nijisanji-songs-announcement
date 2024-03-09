@@ -418,6 +418,10 @@ func (j Job) UpdatePlaylistItem(tx bun.Tx, newlist map[string]int64) error {
 		updateVideo = append(updateVideo, Vtuber{ID: k, ItemCount: v, UpdatedAt: time.Now()})
 	}
 
+	if len(updateVideo) == 0 {
+		return nil
+	}
+
 	_, err := tx.NewUpdate().Model(&updateVideo).Column("item_count", "updated_at").Bulk().Exec(ctx)
 	if err != nil {
 		slog.Error("update-itemCount",
