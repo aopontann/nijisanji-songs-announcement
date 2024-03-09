@@ -13,9 +13,10 @@ import (
 
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/messaging"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
-	"github.com/uptrace/bun/driver/pgdriver"
 	"google.golang.org/api/option"
 	"google.golang.org/api/youtube/v3"
 )
@@ -59,7 +60,11 @@ type User struct {
 
 func UpdatePlaylistItemJob() error {
 	ctx := context.Background()
-	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(os.Getenv("DSN"))))
+	config, err := pgx.ParseConfig(os.Getenv("DSN"))
+	if err != nil {
+		return err
+	}
+	sqldb := stdlib.OpenDB(*config)
 	db := bun.NewDB(sqldb, pgdialect.New())
 
 	yt, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
@@ -93,7 +98,11 @@ func UpdatePlaylistItemJob() error {
 
 func CheckNewVideoJob() error {
 	ctx := context.Background()
-	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(os.Getenv("DSN"))))
+	config, err := pgx.ParseConfig(os.Getenv("DSN"))
+	if err != nil {
+		return err
+	}
+	sqldb := stdlib.OpenDB(*config)
 	db := bun.NewDB(sqldb, pgdialect.New())
 
 	yt, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
@@ -160,7 +169,11 @@ func CheckNewVideoJob() error {
 
 func SongVideoAnnounceJob() error {
 	ctx := context.Background()
-	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(os.Getenv("DSN"))))
+	config, err := pgx.ParseConfig(os.Getenv("DSN"))
+	if err != nil {
+		return err
+	}
+	sqldb := stdlib.OpenDB(*config)
 	db := bun.NewDB(sqldb, pgdialect.New())
 
 	app, err := firebase.NewApp(ctx, nil)
@@ -263,7 +276,11 @@ func SongVideoAnnounceJob() error {
 // 公開済みの動画、Youtube上で削除された動画をDBから削除する
 func DeleteVideoJob() error {
 	ctx := context.Background()
-	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(os.Getenv("DSN"))))
+	config, err := pgx.ParseConfig(os.Getenv("DSN"))
+	if err != nil {
+		return err
+	}
+	sqldb := stdlib.OpenDB(*config)
 	db := bun.NewDB(sqldb, pgdialect.New())
 
 	yt, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
@@ -328,14 +345,18 @@ func DeleteVideoJob() error {
 // キーワード告知（checkNewVideoJobとは別で処理することになった場合に記載）
 func KeywordAnnounceJob() error {
 	ctx := context.Background()
-	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(os.Getenv("DSN"))))
+	config, err := pgx.ParseConfig(os.Getenv("DSN"))
+	if err != nil {
+		panic(err)
+	}
+	sqldb := stdlib.OpenDB(*config)
 	db := bun.NewDB(sqldb, pgdialect.New())
 
 	now, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
 	tAfter := now.Add(-10 * time.Minute)
 	tBefore := now.Add(-5 * time.Minute)
 	var videos []Video
-	err := db.NewSelect().Model(&videos).Where("? BETWEEN ? AND ?", bun.Ident("created_at"), tAfter, tBefore).Scan(ctx)
+	err = db.NewSelect().Model(&videos).Where("? BETWEEN ? AND ?", bun.Ident("created_at"), tAfter, tBefore).Scan(ctx)
 	if err != nil {
 		return err
 	}
