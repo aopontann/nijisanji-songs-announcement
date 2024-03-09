@@ -1,4 +1,0 @@
--- Create "videos" table
-CREATE TABLE `videos` (`id` varchar(11) NOT NULL, `title` varchar(255) NOT NULL, `duration` varchar(255) NOT NULL, `viewers` int NOT NULL, `content` varchar(255) NOT NULL, `announced` bool NULL DEFAULT 0, `scheduled_start_time` timestamp NULL, `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY (`id`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
--- Create "vtubers" table
-CREATE TABLE `vtubers` (`id` varchar(24) NOT NULL, `name` varchar(255) NOT NULL, `item_count` int NULL DEFAULT 0, `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY (`id`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
