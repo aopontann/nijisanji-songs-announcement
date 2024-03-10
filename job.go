@@ -66,6 +66,7 @@ func UpdatePlaylistItemJob() error {
 	}
 	sqldb := stdlib.OpenDB(*config)
 	db := bun.NewDB(sqldb, pgdialect.New())
+	defer db.Close()
 
 	yt, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
 	if err != nil {
@@ -104,6 +105,7 @@ func CheckNewVideoJob() error {
 	}
 	sqldb := stdlib.OpenDB(*config)
 	db := bun.NewDB(sqldb, pgdialect.New())
+	defer db.Close()
 
 	yt, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
 	if err != nil {
@@ -175,6 +177,7 @@ func SongVideoAnnounceJob() error {
 	}
 	sqldb := stdlib.OpenDB(*config)
 	db := bun.NewDB(sqldb, pgdialect.New())
+	defer db.Close()
 
 	app, err := firebase.NewApp(ctx, nil)
 	if err != nil {
@@ -282,6 +285,7 @@ func DeleteVideoJob() error {
 	}
 	sqldb := stdlib.OpenDB(*config)
 	db := bun.NewDB(sqldb, pgdialect.New())
+	defer db.Close()
 
 	yt, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
 	if err != nil {
@@ -351,6 +355,7 @@ func KeywordAnnounceJob() error {
 	}
 	sqldb := stdlib.OpenDB(*config)
 	db := bun.NewDB(sqldb, pgdialect.New())
+	defer db.Close()
 
 	now, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
 	tAfter := now.Add(-10 * time.Minute)
