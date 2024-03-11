@@ -13,9 +13,10 @@ import (
 
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/messaging"
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/mysqldialect"
+	"github.com/uptrace/bun/dialect/pgdialect"
 	"google.golang.org/api/option"
 	"google.golang.org/api/youtube/v3"
 )
@@ -31,8 +32,8 @@ type Vtuber struct {
 	ID        string    `bun:"id,type:varchar(24),pk"`
 	Name      string    `bun:"name,notnull,type:varchar"`
 	ItemCount int64     `bun:"item_count,default:0,type:integer"`
-	CreatedAt time.Time `bun:",nullzero,notnull,default:current_timestamp()"`
-	UpdatedAt time.Time `bun:",nullzero,notnull,default:current_timestamp() ON UPDATE current_timestamp()"`
+	CreatedAt time.Time `bun:"created_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
+	UpdatedAt time.Time `bun:"updated_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
 }
 
 type Video struct {
@@ -45,26 +46,27 @@ type Video struct {
 	Content   string    `bun:"content,notnull,type:varchar"`
 	Announced bool      `bun:"announced,default:false,type:boolean"`
 	StartTime time.Time `bun:"scheduled_start_time,type:timestamp"`
-	CreatedAt time.Time `bun:"created_at,nullzero,notnull,default:current_timestamp()"`
-	UpdatedAt time.Time `bun:"updated_at,nullzero,notnull,default:current_timestamp() ON UPDATE current_timestamp()"`
+	CreatedAt time.Time `bun:"created_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
+	UpdatedAt time.Time `bun:"updated_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
 }
 
 type User struct {
 	bun.BaseModel `bun:"table:users"`
 
 	Token     string    `bun:"token,type:varchar(200),pk"`
-	CreatedAt time.Time `bun:",nullzero,notnull,default:current_timestamp()"`
-	UpdatedAt time.Time `bun:",nullzero,notnull,default:current_timestamp() ON UPDATE current_timestamp()"`
+	CreatedAt time.Time `bun:"created_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
+	UpdatedAt time.Time `bun:"updated_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
 }
 
 func UpdatePlaylistItemJob() error {
-	// 初期化処理
-	sqldb, err := sql.Open("mysql", os.Getenv("DSN"))
+	ctx := context.Background()
+	config, err := pgx.ParseConfig(os.Getenv("DSN"))
 	if err != nil {
 		return err
 	}
-	ctx := context.Background()
-	db := bun.NewDB(sqldb, mysqldialect.New())
+	sqldb := stdlib.OpenDB(*config)
+	db := bun.NewDB(sqldb, pgdialect.New())
+	defer db.Close()
 
 	yt, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
 	if err != nil {
@@ -96,13 +98,14 @@ func UpdatePlaylistItemJob() error {
 }
 
 func CheckNewVideoJob() error {
-	// 初期化処理
-	sqldb, err := sql.Open("mysql", os.Getenv("DSN"))
+	ctx := context.Background()
+	config, err := pgx.ParseConfig(os.Getenv("DSN"))
 	if err != nil {
 		return err
 	}
-	ctx := context.Background()
-	db := bun.NewDB(sqldb, mysqldialect.New())
+	sqldb := stdlib.OpenDB(*config)
+	db := bun.NewDB(sqldb, pgdialect.New())
+	defer db.Close()
 
 	yt, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
 	if err != nil {
@@ -147,7 +150,7 @@ func CheckNewVideoJob() error {
 		return err
 	}
 	if len(filtedVlist) == 0 {
-		tx.Commit()
+		err := tx.Commit()
 		if err != nil {
 			return err
 		}
@@ -167,13 +170,15 @@ func CheckNewVideoJob() error {
 }
 
 func SongVideoAnnounceJob() error {
-	// 初期化処理
-	sqldb, err := sql.Open("mysql", os.Getenv("DSN"))
+	ctx := context.Background()
+	config, err := pgx.ParseConfig(os.Getenv("DSN"))
 	if err != nil {
 		return err
 	}
-	ctx := context.Background()
-	db := bun.NewDB(sqldb, mysqldialect.New())
+	sqldb := stdlib.OpenDB(*config)
+	db := bun.NewDB(sqldb, pgdialect.New())
+	defer db.Close()
+
 	app, err := firebase.NewApp(ctx, nil)
 	if err != nil {
 		slog.Error("firebase.NewApp error",
@@ -273,13 +278,15 @@ func SongVideoAnnounceJob() error {
 
 // 公開済みの動画、Youtube上で削除された動画をDBから削除する
 func DeleteVideoJob() error {
-	// 初期化処理
-	sqldb, err := sql.Open("mysql", os.Getenv("DSN"))
+	ctx := context.Background()
+	config, err := pgx.ParseConfig(os.Getenv("DSN"))
 	if err != nil {
 		return err
 	}
-	ctx := context.Background()
-	db := bun.NewDB(sqldb, mysqldialect.New())
+	sqldb := stdlib.OpenDB(*config)
+	db := bun.NewDB(sqldb, pgdialect.New())
+	defer db.Close()
+
 	yt, err := youtube.NewService(ctx, option.WithAPIKey(os.Getenv("YOUTUBE_API_KEY")))
 	if err != nil {
 		slog.Error("youtube.NewService",
@@ -341,13 +348,14 @@ func DeleteVideoJob() error {
 
 // キーワード告知（checkNewVideoJobとは別で処理することになった場合に記載）
 func KeywordAnnounceJob() error {
-	// 初期化処理
-	sqldb, err := sql.Open("mysql", os.Getenv("DSN"))
-	if err != nil {
-		return err
-	}
 	ctx := context.Background()
-	db := bun.NewDB(sqldb, mysqldialect.New())
+	config, err := pgx.ParseConfig(os.Getenv("DSN"))
+	if err != nil {
+		panic(err)
+	}
+	sqldb := stdlib.OpenDB(*config)
+	db := bun.NewDB(sqldb, pgdialect.New())
+	defer db.Close()
 
 	now, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
 	tAfter := now.Add(-10 * time.Minute)
@@ -410,29 +418,16 @@ func (j Job) NewPlaylistItem() (map[string]int64, error) {
 func (j Job) UpdatePlaylistItem(tx bun.Tx, newlist map[string]int64) error {
 	ctx := context.Background()
 	// DBを新しく取得したデータに更新
-	var upIdList []string
-	var upItemCountList []int64
+	var updateVideo []Vtuber
 	for k, v := range newlist {
-		upIdList = append(upIdList, k)
-		upItemCountList = append(upItemCountList, v)
+		updateVideo = append(updateVideo, Vtuber{ID: k, ItemCount: v, UpdatedAt: time.Now()})
 	}
 
-	// 以下のコメントアウトされたAPIで生成されるSQLではバルクアップデートができなかった(planetscale上)ため、ELT,FIELDを使うようにした
-	// query := db.NewUpdate().Model(&VtuberList).Column("item_count").Bulk()
-	query := tx.NewUpdate().Model((*Vtuber)(nil)).
-		Set("item_count = ELT(FIELD(id, ?), ?)", bun.In(upIdList), bun.In(upItemCountList)).
-		Where("id IN (?)", bun.In(upIdList))
-	_, err := query.AppendQuery(j.db.Formatter(), nil)
-	// TODO: slog.Error 検討
-	if err != nil {
-		slog.Error("query.AppendQuery",
-			slog.String("severity", "ERROR"),
-			slog.String("message", err.Error()),
-		)
-		return err
+	if len(updateVideo) == 0 {
+		return nil
 	}
 
-	_, err = query.Exec(ctx)
+	_, err := tx.NewUpdate().Model(&updateVideo).Column("item_count", "updated_at").Bulk().Exec(ctx)
 	if err != nil {
 		slog.Error("update-itemCount",
 			slog.String("severity", "ERROR"),
@@ -464,6 +459,7 @@ func (j Job) SaveVideos(tx bun.Tx, vlist []youtube.Video) error {
 			Content:   v.Snippet.LiveBroadcastContent,
 			Viewers:   Viewers,
 			StartTime: t,
+			UpdatedAt: time.Now(),
 		})
 	}
 

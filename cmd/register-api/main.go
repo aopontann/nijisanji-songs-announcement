@@ -11,7 +11,8 @@ import (
 
 	nsa "github.com/aopontann/nijisanji-songs-announcement"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/mysqldialect"
+	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/uptrace/bun/driver/pgdriver"
 )
 
 type CheckReqBody struct {
@@ -22,16 +23,9 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger) // 以降、JSON形式で出力される。
 
-	sqldb, err := sql.Open("mysql", os.Getenv("DSN"))
-	if err != nil {
-		slog.Error("sql.Open",
-			slog.String("severity", "ERROR"),
-			slog.String("message", err.Error()),
-		)
-		return
-	}
 	ctx := context.Background()
-	db := bun.NewDB(sqldb, mysqldialect.New())
+	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(os.Getenv("DSN"))))
+	db := bun.NewDB(sqldb, pgdialect.New())
 
 	http.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
 		var b CheckReqBody

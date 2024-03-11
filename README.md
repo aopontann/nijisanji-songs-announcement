@@ -8,15 +8,10 @@
 ### コマンド
 ##### マイグレーション
 ```
-atlas migrate diff create_vtubers_videos_table \
-  --dir "file://db/migrations" \
-  --to "file://db/schema.sql" \
-  --dev-url "docker://mysql/8/nsa"
-
 atlas schema apply \
-  --url "mysql://root:password@localhost:3306/nsa" \
-  --to "file://db/migrations" \
-  --dev-url "docker://mysql/8/example"
+  --url "postgres://postgres:example@/test_db?&sslmode=disable" \
+  --to "file://schema.sql" \
+  --dev-url "docker://postgres/16"
 ```
 ##### デプロイ
 ```
