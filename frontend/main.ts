@@ -10,10 +10,10 @@ const messaging = getMessaging();
 const tokenDivId = 'token_div';
 const permissionDivId = 'permission_div';
 
-// Handle incoming messages. Called when:
-// - a message is received while the app has focus
-// - the user clicks on an app notification created by a service worker
-//   `messaging.onBackgroundMessage` handler.
+  // Handle incoming messages. Called when:
+  // - a message is received while the app has focus
+  // - the user clicks on an app notification created by a service worker
+  //   `messaging.onBackgroundMessage` handler.
 onMessage(messaging, (payload) => {
   console.log('Message received. ', payload);
   // Update the UI to include the received message.
@@ -57,6 +57,9 @@ function sendTokenToServer(currentToken: string) {
   if (!isTokenSentToServer()) {
     console.log('Sending token to server...', currentToken);
     // TODO(developer): Send the current token to your server.
+    postData('/token', { token: currentToken }).then((data) => {
+      console.log(data); // `data.json()` の呼び出しで解釈された JSON データ
+    });
     setTokenSentToServer(true);
   } else {
     console.log('Token already sent to server so won\'t send it again unless it changes');
@@ -106,6 +109,11 @@ function deleteTokenFromFirebase() {
     }).catch((err) => {
       console.log('Unable to delete token. ', err);
     });
+    deleteData('/token', { token: currentToken }).then((data) => {
+      console.log(data); // `data.json()` の呼び出しで解釈された JSON データ
+    }).catch((err) => {
+      console.log('Unable to delete token. (nsa)', err);
+    });;
   }).catch((err) => {
     console.log('Error retrieving registration token. ', err);
     showToken('Error retrieving registration token.');
@@ -147,3 +155,39 @@ document.getElementById('request-permission-button')!.addEventListener('click', 
 document.getElementById('delete-token-button')!.addEventListener('click', deleteTokenFromFirebase);
 
 resetUI();
+
+async function postData(url = "", data = {}) {
+  // 既定のオプションには * が付いています
+  const response = await fetch(url, {
+    method: "POST", // *GET, POST, PUT, DELETE, etc.
+    mode: "cors", // no-cors, *cors, same-origin
+    cache: "no-cache", // *default, no-cache, reload, force-cache, only-if-cached
+    credentials: "same-origin", // include, *same-origin, omit
+    headers: {
+      "Content-Type": "application/json",
+      // 'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    redirect: "follow", // manual, *follow, error
+    referrerPolicy: "no-referrer", // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
+    body: JSON.stringify(data), // 本体のデータ型は "Content-Type" ヘッダーと一致させる必要があります
+  });
+  return response.json(); // JSON のレスポンスをネイティブの JavaScript オブジェクトに解釈
+}
+
+async function deleteData(url = "", data = {}) {
+  // 既定のオプションには * が付いています
+  const response = await fetch(url, {
+    method: "DELETE", // *GET, POST, PUT, DELETE, etc.
+    mode: "cors", // no-cors, *cors, same-origin
+    cache: "no-cache", // *default, no-cache, reload, force-cache, only-if-cached
+    credentials: "same-origin", // include, *same-origin, omit
+    headers: {
+      "Content-Type": "application/json",
+      // 'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    redirect: "follow", // manual, *follow, error
+    referrerPolicy: "no-referrer", // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
+    body: JSON.stringify(data), // 本体のデータ型は "Content-Type" ヘッダーと一致させる必要があります
+  });
+  return response.json(); // JSON のレスポンスをネイティブの JavaScript オブジェクトに解釈
+}
