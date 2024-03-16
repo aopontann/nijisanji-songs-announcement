@@ -3,11 +3,10 @@ package main
 import (
 	"fmt"
 
-	"database/sql"
-
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
-	"github.com/uptrace/bun/driver/pgdriver"
 
 	nsa "github.com/aopontann/nijisanji-songs-announcement"
 )
@@ -15,10 +14,13 @@ import (
 func main() {
 	dsn := "postgres://postgres:example@localhost:5432/test_db?sslmode=disable"
 	// dsn := "unix://user:pass@dbname/var/run/postgresql/.s.PGSQL.5432"
-	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
-
+	config, err := pgx.ParseConfig(dsn)
+	if err != nil {
+		panic(err)
+	}
+	sqldb := stdlib.OpenDB(*config)
 	db := bun.NewDB(sqldb, pgdialect.New())
-
+	defer db.Close()
 	// var ids []string
 	// var itemCount []int64
 	// err = db.NewSelect().Model((*Vtubers)(nil)).Column("id", "item_count").Scan(ctx, &ids, &itemCount)
