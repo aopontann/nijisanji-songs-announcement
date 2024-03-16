@@ -14,8 +14,14 @@ atlas schema apply \
   --dev-url "docker://postgres/16"
 ```
 ##### デプロイ
+バッチ処理のAPI
 ```
 gcloud builds submit --pack image=asia-northeast1-docker.pkg.dev/${PROJECT_ID}/buildpacks-docker-repo/nsa-bot,env=GOOGLE_BUILDABLE="cmd/api/main.go"
 ```
+公開用API
+```
+gcloud builds submit --pack image=asia-northeast1-docker.pkg.dev/${PROJECT_ID}/buildpacks-docker-repo/nsa-bot-web,env=GOOGLE_BUILDABLE="cmd/web/main.go"
+```
 
+### メモ
 export GOOGLE_APPLICATION_CREDENTIALS="token.json"
