@@ -2,17 +2,19 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
 
-	nsa "github.com/aopontann/nijisanji-songs-announcement"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
-	"github.com/uptrace/bun/driver/pgdriver"
+
+	nsa "github.com/aopontann/nijisanji-songs-announcement"
 )
 
 type CheckReqBody struct {
@@ -24,10 +26,17 @@ func main() {
 	slog.SetDefault(logger) // 以降、JSON形式で出力される。
 
 	ctx := context.Background()
-	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(os.Getenv("DSN"))))
+	config, err := pgx.ParseConfig(os.Getenv("DSN"))
+	if err != nil {
+		panic(err)
+	}
+	sqldb := stdlib.OpenDB(*config)
 	db := bun.NewDB(sqldb, pgdialect.New())
 
+	http.Handle("/", http.FileServer(http.Dir("frontend/dist/")))
+
 	http.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("access")
 		var b CheckReqBody
 		if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
 			slog.Error("json.NewDecoder",
@@ -37,6 +46,7 @@ func main() {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		fmt.Println(b)
 
 		if r.Method == http.MethodPost {
 			_, err := db.NewInsert().Model(&nsa.User{Token: b.Token}).Exec(ctx)
@@ -53,7 +63,7 @@ func main() {
 		}
 
 		if r.Method == http.MethodDelete {
-			_, err := db.NewDelete().Model(&nsa.User{Token: b.Token}).Exec(ctx)
+			_, err := db.NewDelete().Model((*nsa.User)(nil)).Where("token = ?", b.Token).Exec(ctx)
 			if err != nil {
 				slog.Error("delete token error",
 					slog.String("severity", "ERROR"),
