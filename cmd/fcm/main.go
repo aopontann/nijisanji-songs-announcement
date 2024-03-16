@@ -29,14 +29,14 @@ func main() {
 
 	// See documentation on defining a message payload.
 	message := &messaging.Message{
-		// Data: map[string]string{
-		// 	"score": "850",
-		// 	"time":  "2:45",
-		// },
-		Notification: &messaging.Notification{
-			Title: "Price drop22",
-			Body:  "5% off all electronics",
+		Data: map[string]string{
+			"title": "video_title",
+			"url":  "http://example.com",
 		},
+		// Notification: &messaging.Notification{
+		// 	Title: "Price drop22",
+		// 	Body:  "5% off all electronics",
+		// },
 		Token: registrationToken,
 	}
 

@@ -243,9 +243,13 @@ func SongVideoAnnounceJob() error {
 
 		// FCM
 		message := &messaging.MulticastMessage{
-			Notification: &messaging.Notification{
-				Title: v.Title,
-				Body:  fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID),
+			// Notification: &messaging.Notification{
+			// 	Title: v.Title,
+			// 	Body:  fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID),
+			// },
+			Data: map[string]string{
+				"title":  v.Title,
+				"url":  fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID),
 			},
 			Tokens: tokens,
 		}
@@ -358,8 +362,8 @@ func KeywordAnnounceJob() error {
 	defer db.Close()
 
 	now, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
-	tAfter := now.Add(-10 * time.Minute)
-	tBefore := now.Add(-5 * time.Minute)
+	tAfter := now.Add(-20 * time.Minute)
+	tBefore := now.Add(-10 * time.Minute)
 	var videos []Video
 	err = db.NewSelect().Model(&videos).Where("? BETWEEN ? AND ?", bun.Ident("created_at"), tAfter, tBefore).Scan(ctx)
 	if err != nil {
