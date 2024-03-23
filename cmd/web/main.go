@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"net/http"
@@ -16,10 +16,6 @@ import (
 
 	nsa "github.com/aopontann/nijisanji-songs-announcement"
 )
-
-type CheckReqBody struct {
-	Token string `json:"token"`
-}
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -35,21 +31,46 @@ func main() {
 
 	http.Handle("/", http.FileServer(http.Dir("frontend/dist/")))
 
+	http.HandleFunc("/is-subscription", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("/is-subscription")
+		if r.Method == http.MethodPost {
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				slog.Error("is-subscription",
+					slog.String("severity", "ERROR"),
+					slog.String("message", err.Error()),
+				)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			exists, err := db.NewSelect().Model((*nsa.User)(nil)).Where("token = ?", string(body)).Exists(ctx)
+			if err != nil {
+				panic(err)
+			}
+			if !exists {
+				w.WriteHeader(http.StatusNotFound)
+				w.Write([]byte("NotFound"))
+				return
+			}
+			w.Write([]byte("OK!!"))
+			return
+		}
+	})
+
 	http.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("access")
-		var b CheckReqBody
-		if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
-			slog.Error("json.NewDecoder",
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			slog.Error("insert token error",
 				slog.String("severity", "ERROR"),
 				slog.String("message", err.Error()),
 			)
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		fmt.Println(b)
 
 		if r.Method == http.MethodPost {
-			_, err := db.NewInsert().Model(&nsa.User{Token: b.Token}).Exec(ctx)
+			_, err := db.NewInsert().Model(&nsa.User{Token: string(body)}).Ignore().Exec(ctx)
 			if err != nil {
 				slog.Error("insert token error",
 					slog.String("severity", "ERROR"),
@@ -63,7 +84,7 @@ func main() {
 		}
 
 		if r.Method == http.MethodDelete {
-			_, err := db.NewDelete().Model((*nsa.User)(nil)).Where("token = ?", b.Token).Exec(ctx)
+			_, err := db.NewDelete().Model((*nsa.User)(nil)).Where("token = ?", string(body)).Exec(ctx)
 			if err != nil {
 				slog.Error("delete token error",
 					slog.String("severity", "ERROR"),
@@ -77,10 +98,15 @@ func main() {
 		}
 	})
 
+	http.HandleFunc("/key", func(w http.ResponseWriter, r *http.Request) {
+		publicKey := os.Getenv("WEBPUSH_PUBLIC_KEY")
+		w.Write([]byte(publicKey))
+	})
+
 	// Determine port for HTTP service.
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = "8081"
 	}
 	// Start HTTP server.
 	log.Printf("Listening on port %s", port)
