@@ -1,160 +1,103 @@
-import { initializeApp } from 'firebase/app';
-import { MessagePayload, deleteToken, getMessaging, getToken, onMessage } from 'firebase/messaging';
-import { firebaseConfig, vapidKey } from './config';
+const checkbox = document.getElementById('subscribe')
 
-initializeApp(firebaseConfig);
+if (window.navigator.serviceWorker !== undefined) {
+  window.navigator.serviceWorker.register('/serviceworker.js');
+}
 
-const messaging = getMessaging();
-
-// IDs of divs that display registration token UI or request permission UI.
-const tokenDivId = 'token_div';
-const permissionDivId = 'permission_div';
-
-  // Handle incoming messages. Called when:
-  // - a message is received while the app has focus
-  // - the user clicks on an app notification created by a service worker
-  //   `messaging.onBackgroundMessage` handler.
-onMessage(messaging, (payload) => {
-  console.log('Message received. ', payload);
-  // Update the UI to include the received message.
-  appendMessage(payload);
-});
-
-function resetUI() {
-  clearMessages();
-  showToken('loading...');
-  // Get registration token. Initially this makes a network call, once retrieved
-  // subsequent calls to getToken will return from cache.
-  getToken(messaging, { vapidKey }).then((currentToken) => {
-    if (currentToken) {
-      sendTokenToServer(currentToken);
-      updateUIForPushEnabled(currentToken);
+window.onload = async() => {
+  console.log("page is fully loaded");
+  try {
+    const registration = await navigator.serviceWorker.ready
+    const subscription = await registration.pushManager.getSubscription()
+    const isOK = await postData('/is-subscription', subscription?.toJSON())
+    if (isOK) {
+      window.localStorage.setItem('isSubscribe', '1');
+      checkbox.checked = true
     } else {
-      // Show permission request.
-      console.log('No registration token available. Request permission to generate one.');
-      // Show permission UI.
-      updateUIForPushPermissionRequired();
-      setTokenSentToServer(false);
+      window.localStorage.setItem('isSubscribe', '0');
+      checkbox.checked = false
     }
-  }).catch((err) => {
-    console.log('An error occurred while retrieving token. ', err);
-    showToken('Error retrieving registration token.');
-    setTokenSentToServer(false);
-  });
-}
+  } catch (error) {
+    window.localStorage.setItem('isSubscribe', '0');
+      checkbox.checked = false
+  }
+};
 
-
-function showToken(currentToken: string) {
-  // Show token in console and UI.
-  const tokenElement = document.querySelector('#token')!;
-  tokenElement.textContent = currentToken;
-}
-
-// Send the registration token your application server, so that it can:
-// - send messages back to this app
-// - subscribe/unsubscribe the token from topics
-function sendTokenToServer(currentToken: string) {
-  if (!isTokenSentToServer()) {
-    console.log('Sending token to server...', currentToken);
-    // TODO(developer): Send the current token to your server.
-    postData('/token', { token: currentToken }).then((data) => {
-      console.log(data); // `data.json()` の呼び出しで解釈された JSON データ
-    });
-    setTokenSentToServer(true);
-  } else {
-    console.log('Token already sent to server so won\'t send it again unless it changes');
+const isSupported = async () => {
+  const permission = await window.Notification.requestPermission()
+  if (permission === 'denied') {
+    window.alert('通知がブロックされています')
+    return false
+  }
+  else if (permission === 'granted') {
+    const registration = await navigator.serviceWorker.ready
+    console.log("サービスワーカーがアクティブ:", registration.active);
+    return true
+  }
+  else {
+    console.log('Unable to get permission to notify.');
+    return false
   }
 }
 
-function isTokenSentToServer() {
-  return window.localStorage.getItem('sentToServer') === '1';
-}
-
-function setTokenSentToServer(sent: boolean) {
-  window.localStorage.setItem('sentToServer', sent ? '1' : '0');
-}
-
-function showHideDiv(divId: string, show: boolean) {
-  const div = document.querySelector('#' + divId)! as HTMLDivElement;
-  if (show) {
-    div.style.display = 'block';
-  } else {
-    div.style.display = 'none';
+async function subscribe() {
+  if (!(await isSupported())) {
+    checkbox.checked = false
   }
-}
-
-function requestPermission() {
-  console.log('Requesting permission...');
-  Notification.requestPermission().then((permission) => {
-    if (permission === 'granted') {
-      console.log('Notification permission granted.');
-      // TODO(developer): Retrieve a registration token for use with FCM.
-      // In many cases once an app has been granted notification permission,
-      // it should update its UI reflecting this.
-      resetUI();
-    } else {
-      console.log('Unable to get permission to notify.');
+  console.log("subscribe")
+  const registration = await navigator.serviceWorker.ready
+  try {
+    const currentLocalSubscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: "BCSvj0H4g72CXuyK_CUy2oygQyRXDyX_BaR2ACtfmEYm2jLj-qCymSnDhfp7acuBISkKxj_UC1TKd6eOPcfr27w",
+    })
+    console.log('currentLocalSubscription:', currentLocalSubscription.toJSON())
+    const isOK = await postData('/token', currentLocalSubscription.toJSON())
+    if (isOK) {
+      window.localStorage.setItem('isSubscribe', '1');
     }
-  });
-}
-
-function deleteTokenFromFirebase() {
-  // Delete registration token.
-  getToken(messaging).then((currentToken) => {
-    deleteToken(messaging).then(() => {
-      console.log('Token deleted.', currentToken);
-      setTokenSentToServer(false);
-      // Once token is deleted update UI.
-      resetUI();
-    }).catch((err) => {
-      console.log('Unable to delete token. ', err);
-    });
-    deleteData('/token', { token: currentToken }).then((data) => {
-      console.log(data); // `data.json()` の呼び出しで解釈された JSON データ
-    }).catch((err) => {
-      console.log('Unable to delete token. (nsa)', err);
-    });;
-  }).catch((err) => {
-    console.log('Error retrieving registration token. ', err);
-    showToken('Error retrieving registration token.');
-  });
-}
-
-// Add a message to the messages element.
-function appendMessage(payload: MessagePayload) {
-  const messagesElement = document.querySelector('#messages')!;
-  const dataHeaderElement = document.createElement('h5');
-  const dataElement = document.createElement('pre');
-  dataElement.style.overflowX = 'hidden;';
-  dataHeaderElement.textContent = 'Received message:';
-  dataElement.textContent = JSON.stringify(payload, null, 2);
-  messagesElement.appendChild(dataHeaderElement);
-  messagesElement.appendChild(dataElement);
-}
-
-// Clear the messages element of all children.
-function clearMessages() {
-  const messagesElement = document.querySelector('#messages')!;
-  while (messagesElement.hasChildNodes()) {
-    messagesElement.removeChild(messagesElement.lastChild!);
+    else {
+      checkbox.checked = false
+      console.log("トークンの登録に失敗しました")
+    }
+  } catch (error) {
+    console.log(error)
+    checkbox.checked = false
   }
 }
 
-function updateUIForPushEnabled(currentToken: string) {
-  showHideDiv(tokenDivId, true);
-  showHideDiv(permissionDivId, false);
-  showToken(currentToken);
+async function unSubscribe() {
+  console.log("unSubscribe")
+  const registration = await navigator.serviceWorker.ready
+  const subscription = await registration.pushManager.getSubscription()
+  try {
+    if (!(await subscription?.unsubscribe())) {
+      console.log("通知の解除に失敗しました")
+      return
+    }
+    const isOK = await deleteData('/token', subscription?.toJSON())
+    if (isOK) {
+      window.localStorage.setItem('isSubscribe', '0');
+    }
+    else {
+      checkbox.checked = false
+      console.log("トークンの削除に失敗しました")
+    }
+  } catch (error) {
+    console.log(error)
+  }
 }
 
-function updateUIForPushPermissionRequired() {
-  showHideDiv(tokenDivId, false);
-  showHideDiv(permissionDivId, true);
-}
+checkbox?.addEventListener('change', (event) => {
+  if (event?.currentTarget?.checked) {
+    // alert('checked');
+    subscribe()
+  } else {
+    // alert('not checked');
+    unSubscribe()
+  }
+})
 
-document.getElementById('request-permission-button')!.addEventListener('click', requestPermission);
-document.getElementById('delete-token-button')!.addEventListener('click', deleteTokenFromFirebase);
-
-resetUI();
 
 async function postData(url = "", data = {}) {
   // 既定のオプションには * が付いています
@@ -171,7 +114,7 @@ async function postData(url = "", data = {}) {
     referrerPolicy: "no-referrer", // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
     body: JSON.stringify(data), // 本体のデータ型は "Content-Type" ヘッダーと一致させる必要があります
   });
-  return response.json(); // JSON のレスポンスをネイティブの JavaScript オブジェクトに解釈
+  return response.ok; // JSON のレスポンスをネイティブの JavaScript オブジェクトに解釈
 }
 
 async function deleteData(url = "", data = {}) {
@@ -189,5 +132,5 @@ async function deleteData(url = "", data = {}) {
     referrerPolicy: "no-referrer", // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
     body: JSON.stringify(data), // 本体のデータ型は "Content-Type" ヘッダーと一致させる必要があります
   });
-  return response.json(); // JSON のレスポンスをネイティブの JavaScript オブジェクトに解釈
+  return response.ok; // JSON のレスポンスをネイティブの JavaScript オブジェクトに解釈
 }
