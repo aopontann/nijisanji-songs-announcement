@@ -7,7 +7,7 @@ export default defineConfig({
       input: [
         'index.html',
         'serviceworker.js',
-        'manifest.json'
+        'manifest.webmanifest'
       ],
       output: {
         entryFileNames: '[name].js',

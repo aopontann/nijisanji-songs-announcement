@@ -1,0 +1,15 @@
+{
+  "background_color": "purple",
+  "description": "歌ってみた動画が公開される5分前に通知をする",
+  "display": "fullscreen",
+  "icons": [
+    {
+      "src": "icon/fox-icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ],
+  "name": "にじさんじ　通知",
+  "short_name": "にじ通",
+  "start_url": "/index.html"
+}
