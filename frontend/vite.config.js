@@ -6,8 +6,7 @@ export default defineConfig({
     rollupOptions: {
       input: [
         'index.html',
-        'serviceworker.js',
-        'manifest.webmanifest'
+        'serviceworker.js'
       ],
       output: {
         entryFileNames: '[name].js',
