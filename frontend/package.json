@@ -19,6 +19,7 @@
   "devDependencies": {
     "@types/jsrsasign": "^10.5.8",
     "prettier": "^3.0.3",
+    "tailwindcss": "^3.4.1",
     "typescript": "^5.1.6",
     "vite": "^4.4.9"
   },
@@ -28,6 +29,7 @@
     "format": "prettier --write ."
   },
   "dependencies": {
-    "firebase": "^10.1.0"
+    "firebase": "^10.1.0",
+    "vite-plugin-pwa": "^0.19.7"
   }
 }
