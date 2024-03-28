@@ -31,7 +31,8 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
     try {
         event.notification.close();
-        clients.openWindow(event.notification.data?.url ?? '/');
+        window.open(event.notification.data?.url ?? '/', '_blank')
+        // clients.openWindow(event.notification.data?.url ?? '/');
     } catch (e) {
         // デバッグ用なので本番では消してもよいです
         console.error(e);
