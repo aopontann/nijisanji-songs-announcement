@@ -45,7 +45,9 @@ func main() {
 			}
 			exists, err := db.NewSelect().Model((*nsa.User)(nil)).Where("token = ?", string(body)).Exists(ctx)
 			if err != nil {
-				panic(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(err.Error()))
+				return
 			}
 			if !exists {
 				w.WriteHeader(http.StatusNotFound)
