@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/dghubble/oauth1"
+	webpush "github.com/SherClockHolmes/webpush-go"
 )
 
 // Misskey関連の機能のレシーバを登録する構造体
@@ -126,4 +127,40 @@ func SendMail(subject string, message string) error {
 				"\r\n"+
 				message+"\r\n"),
 	)
+}
+
+func WebPush(video Video, subscriptionList []string) error {
+	addr := os.Getenv("MAIL_ADDRESS")
+	publicKey := os.Getenv("WEBPUSH_PUBLIC_KEY")
+	privateKey := os.Getenv("WEBPUSH_PRIVATE_KEY")
+
+	reqformatMessage := `
+	{
+		"title": "5分後に公開",
+		"body": "%s",
+		"data": {
+		  "url": "https://youtu.be/%s"
+		},
+		"icon": "%s"
+	  }
+	`
+	req_message := fmt.Sprintf(reqformatMessage, video.Title, video.ID, video.Thumbnail)
+
+	s := &webpush.Subscription{}
+	for _, subscription := range subscriptionList {
+		json.Unmarshal([]byte(subscription), s)
+		// Send Notification
+		_, err := webpush.SendNotification([]byte(req_message), s, &webpush.Options{
+			Subscriber:      addr,
+			VAPIDPublicKey:  publicKey,
+			VAPIDPrivateKey: privateKey,
+			TTL:             5,
+		})
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+		// defer resp.Body.Close()
+	}
+	return nil
 }

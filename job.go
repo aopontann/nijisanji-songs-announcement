@@ -11,8 +11,6 @@ import (
 	"strings"
 	"time"
 
-	firebase "firebase.google.com/go/v4"
-	"firebase.google.com/go/v4/messaging"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/uptrace/bun"
@@ -46,6 +44,7 @@ type Video struct {
 	Content   string    `bun:"content,notnull,type:varchar"`
 	Announced bool      `bun:"announced,default:false,type:boolean"`
 	StartTime time.Time `bun:"scheduled_start_time,type:timestamp"`
+	Thumbnail string    `bun:"thumbnail,notnull,type:varchar"`
 	CreatedAt time.Time `bun:"created_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
 	UpdatedAt time.Time `bun:"updated_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
 }
@@ -53,7 +52,7 @@ type Video struct {
 type User struct {
 	bun.BaseModel `bun:"table:users"`
 
-	Token     string    `bun:"token,type:varchar(200),pk"`
+	Token     string    `bun:"token,type:varchar(1000),pk"`
 	CreatedAt time.Time `bun:"created_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
 	UpdatedAt time.Time `bun:"updated_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
 }
@@ -179,23 +178,6 @@ func SongVideoAnnounceJob() error {
 	db := bun.NewDB(sqldb, pgdialect.New())
 	defer db.Close()
 
-	app, err := firebase.NewApp(ctx, nil)
-	if err != nil {
-		slog.Error("firebase.NewApp error",
-			slog.String("severity", "ERROR"),
-			slog.String("message", err.Error()),
-		)
-		return err
-	}
-	client, err := app.Messaging(ctx)
-	if err != nil {
-		slog.Error("app.Messaging error",
-			slog.String("severity", "ERROR"),
-			slog.String("message", err.Error()),
-		)
-		return err
-	}
-
 	now, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
 	tAfter := now.Add(1 * time.Second)
 	tBefore := now.Add(5 * time.Minute)
@@ -241,21 +223,9 @@ func SongVideoAnnounceJob() error {
 			return err
 		}
 
-		// FCM
-		message := &messaging.MulticastMessage{
-			Notification: &messaging.Notification{
-				Title: v.Title,
-				Body:  fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID),
-			},
-			Tokens: tokens,
-		}
-		// 500通まで
-		_, err := client.SendEachForMulticast(ctx, message)
+		// push通知
+		err = WebPush(v, tokens)
 		if err != nil {
-			slog.Error("SendEachForMulticast error",
-				slog.String("severity", "ERROR"),
-				slog.String("message", err.Error()),
-			)
 			return err
 		}
 
@@ -358,8 +328,8 @@ func KeywordAnnounceJob() error {
 	defer db.Close()
 
 	now, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
-	tAfter := now.Add(-10 * time.Minute)
-	tBefore := now.Add(-5 * time.Minute)
+	tAfter := now.Add(-20 * time.Minute)
+	tBefore := now.Add(-10 * time.Minute)
 	var videos []Video
 	err = db.NewSelect().Model(&videos).Where("? BETWEEN ? AND ?", bun.Ident("created_at"), tAfter, tBefore).Scan(ctx)
 	if err != nil {
@@ -458,6 +428,7 @@ func (j Job) SaveVideos(tx bun.Tx, vlist []youtube.Video) error {
 			Duration:  v.ContentDetails.Duration,
 			Content:   v.Snippet.LiveBroadcastContent,
 			Viewers:   Viewers,
+			Thumbnail: v.Snippet.Thumbnails.Default.Url,
 			StartTime: t,
 			UpdatedAt: time.Now(),
 		})
