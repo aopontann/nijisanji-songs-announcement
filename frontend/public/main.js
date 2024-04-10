@@ -1,5 +1,3 @@
-import manifest from './manifest.json'
-
 const checkbox = document.getElementById('subscribe')
 const confEle = document.getElementById('subscription-conf')
 const loadingEle = document.getElementById('loading')
