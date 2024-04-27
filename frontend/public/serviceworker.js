@@ -1,4 +1,19 @@
-self.addEventListener('push', (event) => {
+self.addEventListener('push', async (event) => {
+    const subscription = await event.currentTarget.registration.pushManager.getSubscription()
+    console.log(subscription.toJSON())
+    const res = await fetch('/api/analysis', {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        redirect: "follow",
+        body: JSON.stringify(subscription.toJSON()),
+    });
+    if (res.ok) {
+        console.log('fetch ok')
+    } else {
+        console.log('fetch ng')
+    }
     try {
         if (
             self.Notification == null ||
