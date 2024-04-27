@@ -32,7 +32,8 @@ window.onload = async() => {
       loadingEle.style.display = 'none'
       return
     }
-    const isOK = await postData('/is-subscription', subscription.toJSON())
+    const isOK = await postData('/api/subscription/check', subscription.toJSON())
+    console.log('isOK:', isOK)
     if (isOK) {
       checkbox.checked = true
     } else {
@@ -101,7 +102,7 @@ async function subscribe() {
       applicationServerKey: "BCSvj0H4g72CXuyK_CUy2oygQyRXDyX_BaR2ACtfmEYm2jLj-qCymSnDhfp7acuBISkKxj_UC1TKd6eOPcfr27w",
     })
     console.log('currentLocalSubscription:', currentLocalSubscription.toJSON())
-    const isOK = await postData('/token', currentLocalSubscription.toJSON())
+    const isOK = await postData('/api/subscription', currentLocalSubscription.toJSON())
     if (isOK) {
       checkbox.checked = true
     }
@@ -125,7 +126,7 @@ async function unSubscribe() {
       checkbox.checked = true
       return
     }
-    const isOK = await deleteData('/token', subscription?.toJSON())
+    const isOK = await deleteData('/api/subscription', subscription?.toJSON())
     if (isOK) {
       checkbox.checked = false
     }
@@ -153,6 +154,8 @@ async function postData(url = "", data = {}) {
     referrerPolicy: "no-referrer", // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
     body: JSON.stringify(data), // 本体のデータ型は "Content-Type" ヘッダーと一致させる必要があります
   });
+  console.log(response.status)
+  console.log(response.ok)
   return response.ok; // JSON のレスポンスをネイティブの JavaScript オブジェクトに解釈
 }
 
