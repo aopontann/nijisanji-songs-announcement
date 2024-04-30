@@ -191,9 +191,16 @@ func SongVideoAnnounceJob() error {
 	// mk := NewMisskey(os.Getenv("MISSKEY_TOKEN"))
 
 	var tokens []string
-	err = db.NewSelect().Model((*User)(nil)).Column("token").Scan(ctx, &tokens)
+	// err = db.NewSelect().Model((*User)(nil)).Column("token").Scan(ctx, &tokens)
+	// if err != nil {
+	// 	return err
+	// }
+	list, err := GetUserTokenList()
 	if err != nil {
 		return err
+	}
+	for _, user := range list {
+		tokens = append(tokens, user.Token)
 	}
 
 	for _, v := range videos {

@@ -24,4 +24,15 @@ gcloud builds submit --pack image=asia-northeast1-docker.pkg.dev/${PROJECT_ID}/b
 ```
 
 ### メモ
+'''
 export GOOGLE_APPLICATION_CREDENTIALS="token.json"
+
+npx wrangler pages dev ./public
+
+npx wrangler pages deploy ./public
+
+nvm install 20
+
+wrangler d1 execute niji-tuu \
+  --local --command "CREATE TABLE IF NOT EXISTS users ( token TEXT PRIMARY KEY, song INTEGER, word TEXT, time TEXT);"
+'''

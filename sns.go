@@ -150,7 +150,7 @@ func WebPush(video Video, subscriptionList []string) error {
 	for _, subscription := range subscriptionList {
 		json.Unmarshal([]byte(subscription), s)
 		// Send Notification
-		_, err := webpush.SendNotification([]byte(req_message), s, &webpush.Options{
+		res, err := webpush.SendNotification([]byte(req_message), s, &webpush.Options{
 			Subscriber:      addr,
 			VAPIDPublicKey:  publicKey,
 			VAPIDPrivateKey: privateKey,
@@ -160,7 +160,12 @@ func WebPush(video Video, subscriptionList []string) error {
 			fmt.Println(err)
 			return err
 		}
-		// defer resp.Body.Close()
+		slog.Info(
+			"song-webpush",
+			slog.String("severity", "INFO"),
+			slog.String("vid", video.ID),
+			slog.String("status_code", res.Status),
+		)
 	}
 	return nil
 }

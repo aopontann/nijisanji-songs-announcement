@@ -9,3 +9,5 @@ atlas.sum
 *.tfvars
 
 node_modules
+.wrangler
+.dev.vars

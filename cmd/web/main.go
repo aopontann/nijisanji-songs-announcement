@@ -29,7 +29,7 @@ func main() {
 	sqldb := stdlib.OpenDB(*config)
 	db := bun.NewDB(sqldb, pgdialect.New())
 
-	http.Handle("/", http.FileServer(http.Dir("frontend/dist/")))
+	http.Handle("/", http.FileServer(http.Dir("frontend/public/")))
 
 	http.HandleFunc("/is-subscription", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("/is-subscription")
