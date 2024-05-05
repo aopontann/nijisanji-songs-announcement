@@ -44,7 +44,46 @@ func GetUserTokenList() ([]Result, error) {
 
 	payload := strings.NewReader(`
   {
-    "sql": "SELECT * FROM users;"
+    "sql": "SELECT * FROM users WHERE song = 1;"
+  }`)
+
+	client := &http.Client{}
+	req, err := http.NewRequest(method, url, payload)
+
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Authorization", "Bearer " + token)
+
+	res, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	s := &D1Response{}
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	json.Unmarshal(body, s)
+	// fmt.Println(string(body))
+	return s.Result[0].Results, nil
+}
+
+func GetKeywordRegisterList() ([]Result, error) {
+
+	url := os.Getenv("D1_URL")
+	method := "POST"
+	token := os.Getenv("D1_TOKEN")
+
+	payload := strings.NewReader(`
+  {
+    "sql": "SELECT * FROM users WHERE not word = '';"
   }`)
 
 	client := &http.Client{}
