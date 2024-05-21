@@ -154,7 +154,8 @@ func WebPush(video Video, subscriptionList []string) error {
 			Subscriber:      addr,
 			VAPIDPublicKey:  publicKey,
 			VAPIDPrivateKey: privateKey,
-			TTL:             5,
+			TTL:             300,
+			Urgency: webpush.UrgencyHigh,
 		})
 		if err != nil {
 			fmt.Println(err)

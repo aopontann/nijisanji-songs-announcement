@@ -9,8 +9,8 @@ export async function onRequestPost(context) {
         if (res.success)
             return new Response("OK")
         else
-            return new Response("NG", null, 400)
+            return new Response("NG", { status: 400 })
     } catch (error) {
-        return new Response("NG", null, 500)
+        return new Response("NG", { status: 500 })
     }
 }

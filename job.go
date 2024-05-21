@@ -3,6 +3,7 @@ package nsa
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	webpush "github.com/SherClockHolmes/webpush-go"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/uptrace/bun"
@@ -343,11 +345,57 @@ func KeywordAnnounceJob() error {
 		return err
 	}
 
+	list, err := GetKeywordRegisterList()
+	if err != nil {
+		return err
+	}
+
+	addr := os.Getenv("MAIL_ADDRESS")
+	publicKey := os.Getenv("WEBPUSH_PUBLIC_KEY")
+	privateKey := os.Getenv("WEBPUSH_PRIVATE_KEY")
+
+	reqformatMessage := `
+	{
+		"title": "キーワード告知",
+		"body": "%s",
+		"data": {
+		  "url": "https://youtu.be/%s"
+		},
+		"icon": "%s"
+	  }
+	`
+
 	for _, v := range videos {
-		if regexp.MustCompile(`.*Lethal Company.*`).Match([]byte(v.Title)) {
-			err := SendMail("Lethal Company やるよ！", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID))
-			if err != nil {
-				return err
+		req_message := fmt.Sprintf(reqformatMessage, v.Title, v.ID, v.Thumbnail)
+		for _, r := range list {
+			reg := ".*" + r.Word + ".*"
+			// キーワードに一致した場合
+			if regexp.MustCompile(reg).Match([]byte(v.Title)) {
+				// メール送信
+				err := SendMail("キーワード告知："+r.Word, fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID))
+				if err != nil {
+					return err
+				}
+				// Webpush
+				s := &webpush.Subscription{}
+				json.Unmarshal([]byte(r.Token), s)
+				res, err := webpush.SendNotification([]byte(req_message), s, &webpush.Options{
+					Subscriber:      addr,
+					VAPIDPublicKey:  publicKey,
+					VAPIDPrivateKey: privateKey,
+					TTL:             3600 * 12,
+				})
+				if err != nil {
+					fmt.Println(err)
+					return err
+				}
+				slog.Info(
+					"keyword-webpush",
+					slog.String("severity", "INFO"),
+					slog.String("vid", v.ID),
+					slog.String("status_code", res.Status),
+				)
+
 			}
 		}
 	}
