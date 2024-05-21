@@ -3,6 +3,11 @@ tmp
 .DS_STORE
 oryxBuildBinary
 token.json
+atlas.sum
 
 **/.terraform/*
 *.tfvars
+
+node_modules
+.wrangler
+.dev.vars

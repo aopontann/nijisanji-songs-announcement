@@ -1,0 +1,12 @@
+{
+  "name": "niji-tuu",
+  "version": "1.0.0",
+  "description": "歌ってみた動画を告知",
+  "devDependencies": {
+    "@types/jsrsasign": "^10.5.8",
+    "prettier": "^3.0.3"
+  },
+  "scripts": {
+    "dev": "npx wrangler pages dev ./public"
+  }
+}
