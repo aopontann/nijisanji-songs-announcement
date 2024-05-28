@@ -9,3 +9,5 @@ atlas.sum
 node_modules
 .wrangler
 dist
+# 一旦config情報ファイルは追加
+config.js
