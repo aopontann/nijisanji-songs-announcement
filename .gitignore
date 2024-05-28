@@ -5,9 +5,7 @@ oryxBuildBinary
 token.json
 atlas.sum
 
-**/.terraform/*
-*.tfvars
-
+# フロントエンド
 node_modules
 .wrangler
-.dev.vars
+dist
