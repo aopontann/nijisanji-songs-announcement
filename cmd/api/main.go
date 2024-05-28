@@ -7,14 +7,31 @@ import (
 	"os"
 
 	nsa "github.com/aopontann/nijisanji-songs-announcement"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
 )
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger) // 以降、JSON形式で出力される。
 
+	config, err := pgx.ParseConfig(os.Getenv("DSN"))
+	if err != nil {
+		panic(err)
+	}
+	sqldb := stdlib.OpenDB(*config)
+	db := bun.NewDB(sqldb, pgdialect.New())
+	defer db.Close()
+
+	job := nsa.NewJobs(
+		os.Getenv("YOUTUBE_API_KEY"),
+		db,
+	)
+
 	http.HandleFunc("/v2/check", func(w http.ResponseWriter, r *http.Request) {
-		err := nsa.CheckNewVideoJob()
+		err := job.CheckNewVideoJob()
 		if err != nil {
 			slog.Error("CheckNewVideoJob",
 				slog.String("severity", "ERROR"),
@@ -24,7 +41,7 @@ func main() {
 		}
 	})
 	http.HandleFunc("/v2/keyword", func(w http.ResponseWriter, r *http.Request) {
-		err := nsa.KeywordAnnounceJob()
+		err := job.KeywordAnnounceJob()
 		if err != nil {
 			slog.Error("KeywordAnnounceJob",
 				slog.String("severity", "ERROR"),
@@ -34,7 +51,7 @@ func main() {
 		}
 	})
 	http.HandleFunc("/v2/song", func(w http.ResponseWriter, r *http.Request) {
-		err := nsa.SongVideoAnnounceJob()
+		err := job.SongVideoAnnounceJob()
 		if err != nil {
 			slog.Error("SongVideoAnnounceJob",
 				slog.String("severity", "ERROR"),
@@ -44,7 +61,7 @@ func main() {
 		}
 	})
 	http.HandleFunc("/v2/delete", func(w http.ResponseWriter, r *http.Request) {
-		err := nsa.DeleteVideoJob()
+		err := job.DeleteVideoJob()
 		if err != nil {
 			slog.Error("DeleteVideoJob",
 				slog.String("severity", "ERROR"),
@@ -55,7 +72,7 @@ func main() {
 	})
 
 	http.HandleFunc("/v2/playlistItems/update", func(w http.ResponseWriter, r *http.Request) {
-		err := nsa.UpdatePlaylistItemJob()
+		err := job.UpdatePlaylistItemJob()
 		if err != nil {
 			slog.Error("UpdatePlaylistItemJob",
 				slog.String("severity", "ERROR"),

@@ -11,7 +11,7 @@ export async function onRequestGet(context) {
         console.log(res)
 
         if (res == null) {
-            return new Response("NG", { status: 404 })
+            return new Response(null)
         } else {
             return new Response(JSON.stringify(res), {
                 headers:
@@ -29,6 +29,7 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
     const json = await context.request.json()
     console.log(context.request.headers)
+    console.log(json)
     const token = context.request.headers.get("Token")
 
     try {

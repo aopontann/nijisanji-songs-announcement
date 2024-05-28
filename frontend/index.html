@@ -7,7 +7,7 @@
   <title>にじ通</title>
   <link rel="stylesheet" href="style.css">
   <link rel="manifest" href="manifest.webmanifest">
-  <meta name="description" content="にじさんじの動画に関する通知をお届けします">
+  <meta name="description" content="にじさんじの歌みた動画を通知するサービスです">
 </head>
 
 <script src='main.js' type='module'></script>
@@ -37,12 +37,13 @@
     <input id='ok' type="button" value="確認しました">
   </dialog>
 
-  <p>
-    <input id='permission' style="display: none;" type="button" value="通知許可">
-  </p>
-  <p id="msg" style="display: block;"></p>
+  <dialog id="WarningDialog">
+    <p>
+      iPhone, iPad, iPodをお使いの場合、「共有」→「ホーム画面に追加」して、追加されたアイコンから起動してください
+    </p>
+  </dialog>
 
-  <div id="subscription-conf" style="display: none;">
+  <div id="subscription-conf">
     <h3>通知設定</h3>
     <div style="width:100%; display:flex; justify-content:flex-start;">
       <input id='song' type="checkbox" value="">
