@@ -8,6 +8,7 @@ atlas.sum
 # フロントエンド
 node_modules
 .wrangler
+.astro
 dist
 # 一旦config情報ファイルは追加
 config.js
