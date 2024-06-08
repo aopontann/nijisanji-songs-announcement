@@ -1,16 +1,28 @@
 {
-  "name": "niji-tuu",
-  "version": "1.0.0",
-  "description": "歌ってみた動画を告知",
+  "name": "my-astro-app",
+  "type": "module",
+  "version": "0.0.1",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "devDependencies": {
-    "vite": "^5.2.0"
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro build && wrangler pages dev",
+    "astro": "astro",
+    "deploy": "astro build && wrangler pages deploy",
+    "cf-typegen": "wrangler types"
   },
   "dependencies": {
-    "firebase": "^10.1.0"
+    "@astrojs/check": "^0.7.0",
+    "@astrojs/cloudflare": "^10.2.6",
+    "@astrojs/tailwind": "^5.1.0",
+    "astro": "^4.9.2",
+    "firebase": "^10.12.2",
+    "flowbite": "^2.3.0",
+    "typescript": "^5.4.5"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240529.0",
+    "@tailwindcss/typography": "^0.5.13",
+    "wrangler": "^3.58.0"
   }
 }

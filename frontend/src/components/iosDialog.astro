@@ -1,0 +1,27 @@
+<dialog
+    id="WarningDialog"
+    class="relative bg-white rounded-lg shadow dark:bg-gray-700 absolute -translate-y-1/2 top-2/4"
+>
+    <div class="p-4 md:p-5 space-y-4">
+        <p class="text-base leading-relaxed text-gray-500 dark:text-gray-400">
+            iPhone, iPad,
+            iPodをお使いの場合、「共有」→「ホーム画面に追加」して、追加されたアイコンから起動してください
+        </p>
+    </div>
+</dialog>
+
+<script>
+    const isIos = () => {
+        const userAgent = window.navigator.userAgent.toLowerCase();
+        return /iphone|ipad|ipod/.test(userAgent);
+    };
+
+    // check if the device is in standalone mode
+    const isInStandaloneMode = () => {
+        return window.matchMedia("(display-mode: standalone)").matches;
+    };
+
+    if (isIos() && !isInStandaloneMode()) {
+        document.getElementById("WarningDialog").showModal();
+    }
+</script>
