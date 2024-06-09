@@ -26,32 +26,46 @@ const messaging = firebase.messaging();
 // https://firebase.google.com/docs/cloud-messaging/concept-options
 messaging.onBackgroundMessage(function (payload) {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
-  // Customize notification here
+
   const notificationTitle = payload.data.title;
   const notificationOptions = {
     body: payload.data.body,
     icon: payload.data.icon
   };
 
-  self.registration.showNotification(notificationTitle,
-    notificationOptions);
+  if (payload.data.type === "keyword") {
+    keywordNotification(payload)
+    return
+  }
+
+  self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-const getKeyword = () => {
-  const openRequest = window.indexedDB.open("niji-tuu", 1);
+const keywordNotification = (payload) => {
+  const notificationTitle = payload.data.title;
+  const notificationOptions = {
+    body: payload.data.body,
+    icon: payload.data.icon
+  };
 
+  const openRequest = self.indexedDB.open("niji-tuu", 1);
   openRequest.onsuccess = function () {
     console.log("onsuccess")
     const db = openRequest.result;
     const transaction = db.transaction("keyword", "readonly");
     const objectStore = transaction.objectStore("keyword");
     const request = objectStore.get("1");
+
     request.onerror = (event) => {
       console.log("error:", request)
     };
     request.onsuccess = (event) => {
       // request.result に対して行う処理!
       console.log("text:", request.result.text)
+      const reg = new RegExp(request.result.text)
+      if (reg.test(payload.data.body)) {
+        self.registration.showNotification(notificationTitle, notificationOptions);
+      }
     };
   };
 }
