@@ -6,7 +6,7 @@ export async function onRequestGet(context) {
     const token = context.request.headers.get("Token")
 
     try {
-        const stmt = context.env.MY_DB.prepare('SELECT song, word FROM users WHERE token = ?1 LIMIT 1').bind(token);
+        const stmt = context.env.MY_DB.prepare('SELECT song, keyword FROM users WHERE token = ?1 LIMIT 1').bind(token);
         const res = await stmt.first()
         console.log(res)
 
@@ -29,17 +29,19 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
     const json = await context.request.json()
     console.log(context.request.headers)
-    console.log(json)
+    console.log("json:", json)
     const token = context.request.headers.get("Token")
+    console.log("token:", token)
 
     try {
-        const res = await context.env.MY_DB.prepare('INSERT INTO users (token, song, word, time) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(token) do update set song = ?2, word = ?3').bind(token, json.song, json.word, '').run()
+        const res = await context.env.MY_DB.prepare('INSERT INTO users (token, song, keyword, time) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(token) do update set song = ?2, keyword = ?3').bind(token, json.song, json.word, '').run()
         console.log(res)
         if (res.success)
             return new Response("OK")
         else
             return new Response("NG", { status: 400 })
     } catch (error) {
+        console.log(error)
         return new Response("NG", { status: 500 })
     }
 }
