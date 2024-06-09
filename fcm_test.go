@@ -23,6 +23,7 @@ func TestSend(t *testing.T) {
 
 	err := fcm.Send(
 		video,
+		"song",
 		"5分後に公開",
 		[]string{
 			"cXPUH6Zl18wtzVCAPI7KaE:APA91bGW4wQ3-k2PgHbEeQzod54NVhK6hwIA9GdfZZyTDt5uE9NJTLSP_QonuDm808bNz8rGHdFCvXeB1_TB9CaEIXnlDAJ5Cu5OW0VyBNV8ezQLaGeDw-eqGVTPavSP2sKvWdfNFktI",

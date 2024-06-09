@@ -27,9 +27,10 @@ func NewFCM() *FCM {
 	return &FCM{client}
 }
 
-func (c *FCM) Send(video Video, title string, tokens []string, urgency string) error {
+func (c *FCM) Send(video Video, sendType string, title string, tokens []string, urgency string) error {
 	message := &messaging.MulticastMessage{
 		Data: map[string]string{
+			"type": sendType,
 			"title": title,
 			"body":  video.Title,
 			"url":   "https://youtu.be/" + video.ID,
