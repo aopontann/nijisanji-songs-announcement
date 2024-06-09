@@ -6,13 +6,13 @@ initializeApp(firebaseConfig);
 
 const messaging = getMessaging();
 
-const songEle = document.getElementById('song')
-const keywordEle = document.getElementById('keyword')
+const songEle = document.getElementById('checkbox-song')
+const keywordEle = document.getElementById('checkbox-keyword')
 const keywordTextEle = document.getElementById('keyword-text')
 
-if (window.navigator.serviceWorker !== undefined) {
-  window.navigator.serviceWorker.register('/firebase-messaging-sw.js');
-}
+// if (window.navigator.serviceWorker !== undefined) {
+//   window.navigator.serviceWorker.register('/firebase-messaging-sw.js');
+// }
 
 window.onload = async () => {
   console.log("page is fully loaded");
@@ -23,82 +23,11 @@ window.onload = async () => {
     return
   }
 
-  // ------------------------------- ボタン クリックイベント処理 ------------------------------- //
-  // 保存ボタン
-  // document.getElementById('submit').addEventListener('click', async () => {
-  //   console.log("POST")
-  //   document.getElementById("submit-spinner").style.display = "block"
-  //   document.getElementById("submit-text").value = "通知登録中..."
-
-  //   console.log("generate token...")
-  //   var currentToken = ""
-  //   try {
-  //     currentToken = await getToken(messaging, { vapidKey })
-  //     console.log("generated token:", currentToken)
-  //   } catch (error) {
-  //     document.getElementById("submit-spinner").style.display = "none"
-  //     document.getElementById("submit-text").value = "通知登録"
-  //     // 通知権限がブロックされている場合
-  //     if (Notification.permission === "denied") {
-  //       window.alert('通知がブロックされています。')
-  //       return
-  //     }
-
-  //     // 通知権限がブロックされていないが、ユーザーの許可を得れていない場合
-  //     if (Notification.permission === "default") {
-  //       window.alert('通知を許可してください。')
-  //       return
-  //     }
-
-  //     // 通知権限がブロックされていないが、ユーザーの許可を得れていない場合
-  //     if (Notification.permission === "granted") {
-  //       window.alert('エラーが発生しました。再度通知登録をしてください。')
-  //       return
-  //     }
-  //   }
-
-  //   if (currentToken == "") {
-  //     return
-  //   }
-  //   console.log("songEle", songEle)
-  //   console.log("keywordTextEle", keywordTextEle)
-
-  //   const ok = await saveToken(currentToken, { song: songEle.checked ? 1 : 0, word: keywordEle.checked && keywordTextEle.value || "" })
-  //   if (!ok) {
-  //     window.alert('トークンの登録に失敗しました')
-  //     console.log("トークンの登録に失敗しました")
-  //   }
-
-  //   window.localStorage.setItem("fcm-token", currentToken)
-  //   // document.getElementById("toast-success").style.display = "block"
-  //   document.getElementById("toast-success").style.visibility = "visible"
-
-  //   document.getElementById("submit-spinner").style.display = "none"
-  //   document.getElementById("submit-text").value = "通知登録"
-  // })
-  
   // 通知解除ボタン
   document.getElementById('delete').addEventListener("click", async () => {
     console.log("DELETE")
     document.getElementById("delete-spinner").style.display = "block"
     document.getElementById("submit-text").value = "通知解除中..."
-
-    const openRequest = window.indexedDB.open("niji-tuu", 1);
-
-    openRequest.onsuccess = function () {
-      console.log("onsuccess")
-      const db = openRequest.result;
-      const transaction = db.transaction("keyword", "readonly");
-      const objectStore = transaction.objectStore("keyword");
-      const request = objectStore.get("1");
-      request.onerror = (event) => {
-        console.log("error:", request)
-      };
-      request.onsuccess = (event) => {
-        // request.result に対して行う処理!
-        console.log("text:", request.result)
-      };
-  };
 
     // FCMトークン削除
     const deleted = await deleteToken(messaging)
@@ -119,7 +48,6 @@ window.onload = async () => {
       document.getElementById("toast-success").style.visibility = "visible"
     }
 
-
     document.getElementById("delete-spinner").style.display = "none"
     document.getElementById("submit-text").value = "通知解除"
     songEle.checked = false
@@ -133,6 +61,25 @@ window.onload = async () => {
   if (currentToken == null) {
     return
   }
+  
+  // キーワードを書き込む
+  const openRequest = window.indexedDB.open("niji-tuu", 1);
+  openRequest.onsuccess = function () {
+    console.log("onsuccess")
+    const db = openRequest.result;
+    const transaction = db.transaction("keyword", "readonly");
+    const objectStore = transaction.objectStore("keyword");
+    const request = objectStore.get("1");
+
+    request.onerror = (event) => {
+      console.log("error:", request)
+    };
+    request.onsuccess = (event) => {
+      // request.result に対して行う処理!
+      console.log("text:", request.result.text)
+      keywordTextEle.value = request.result.text
+    };
+  };
 
   document.getElementById("overlay").style.display = "block"
 
@@ -158,16 +105,12 @@ window.onload = async () => {
   if (data.song == 1) {
     songEle.checked = true
   }
-  if (data.word != '') {
-    keywordTextEle.value = data.word
+  if (data.keyword == 1) {
     keywordEle.checked = true
-  }
-  if (data.word == '') {
-    keywordTextEle.value = window.localStorage.getItem("word")
   }
 
   document.getElementById("overlay").style.display = "none"
-  };
+};
 
 
 async function fcmToken(method, token) {
