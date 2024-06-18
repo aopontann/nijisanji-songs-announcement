@@ -14,15 +14,14 @@
   "dependencies": {
     "@astrojs/check": "^0.7.0",
     "@astrojs/cloudflare": "^10.2.6",
-    "@astrojs/tailwind": "^5.1.0",
     "astro": "^4.9.2",
+    "bulma-toast": "^2.4.4",
     "firebase": "^10.12.2",
-    "flowbite": "^2.3.0",
     "typescript": "^5.4.5"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20240529.0",
-    "@tailwindcss/typography": "^0.5.13",
+    "prettier": "^3.3.2",
+    "prettier-plugin-astro": "^0.14.0",
     "wrangler": "^3.58.0"
   }
 }

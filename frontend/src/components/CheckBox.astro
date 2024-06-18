@@ -1,52 +1,26 @@
----
-import KeyWord from "./keyWord.astro";
----
-
-<h5 class="text-xl font-bold dark:text-white pb-2 mb-2">通知設定</h5>
-
-<div class="flex items-center mb-4">
-    <input
-        id="checkbox-song"
-        type="checkbox"
-        value=""
-        class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-    />
-    <label
-        for="default-checkbox"
-        class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300"
-        >歌みた動画が公開される5分前に通知を受け取る</label
-    >
-</div>
-
-<div class="flex">
-    <div class="flex items-center h-5">
-        <input
-            id="checkbox-keyword"
-            aria-describedby="helper-checkbox-text"
-            type="checkbox"
-            value=""
-            class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-        />
-    </div>
-    <div class="ms-2 text-sm">
-        <label
-            for="helper-checkbox"
-            class="font-medium text-gray-900 dark:text-gray-300"
-            >指定したキーワードを含む動画がアップロードされた際に通知を受け取る(ベータ版)</label
-        >
-        <KeyWord />
-    </div>
-</div>
+<label class="checkbox mb-2">
+  <input id="checkbox-song" type="checkbox" />
+  歌みた動画が公開される5分前に通知を受け取る
+</label>
+<label class="checkbox mb-2">
+  <input id="checkbox-keyword" type="checkbox" />
+  指定したキーワードを含む動画がアップロードされた際に通知を受け取る(Androidのみ)
+</label>
 
 <script>
-    const songEle = document.getElementById('checkbox-song') as HTMLElement
-    const keywordEle = document.getElementById('checkbox-keyword') as HTMLElement
+  import { isIos } from "../scripts/main";
+  const songEle = document.getElementById("checkbox-song") as HTMLElement;
+  const keywordEle = document.getElementById("checkbox-keyword") as HTMLElement;
 
-    songEle.addEventListener('click', async () => {
-        window.localStorage.setItem("song-checked", songEle.checked)
-    })
+  songEle.addEventListener("click", async () => {
+    window.localStorage.setItem("checkbox-song", songEle.checked)
+  });
 
-    keywordEle.addEventListener('click', async () => {
-        window.localStorage.setItem("keyword-checked", keywordEle.checked)
-    })
+  keywordEle.addEventListener("click", async () => {
+    window.localStorage.setItem("checkbox-keyword", keywordEle.checked);
+  });
+
+  if (isIos()) {
+    keywordEle.disabled = true
+  }
 </script>
