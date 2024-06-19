@@ -1,0 +1,33 @@
+<div id="modal-js" class="modal">
+  <div class="modal-background"></div>
+  <div class="modal-content">
+    <div class="box mr-3 ml-3">
+      <h3>にじ通へようこそ！</h3>
+      <p>
+        当サイトをお使いの前に<a href="/terms">利用規約</a>、<a href="/policy">プライバシーポリシー</a>をご確認ください。
+      </p>
+      <button id="ok" class="button is-primary">確認しました</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { isIos, isInStandaloneMode } from "../scripts/main";
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const modalEle = document.getElementById("modal-js") as HTMLElement;
+    const buttonEle = document.getElementById("ok") as HTMLElement;
+    buttonEle.addEventListener("click", () => {
+      console.log("click");
+      window.localStorage.setItem("readed-terms", "true");
+      modalEle.classList.remove("is-active");
+    });
+  
+    if (isIos() && !isInStandaloneMode()) {
+      // 何もしない
+    } else if (window.localStorage.getItem("readed-terms") !== "true") {
+      modalEle.classList.add("is-active");
+    }
+  })
+
+</script>

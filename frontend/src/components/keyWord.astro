@@ -1,15 +1,12 @@
-<input
-    type="text"
-    id="keyword-text"
-    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full ps-5 p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 mt-2"
-    placeholder="キーワード..."
-/>
+<input id="keyword-text" class="input" type="text" placeholder="キーワード" />
 
 <script>
-    const ele = document.getElementById("keyword-text") as HTMLElement
+  const ele = document.getElementById("keyword-text") as HTMLInputElement;
+  // キーワード初期化処理
+  const keyword = window.localStorage.getItem("keyword") as string;
+  ele.value = keyword;
 
-    ele.addEventListener("change", (event) => {
-        window.localStorage.setItem("word", event.target?.value)
-    })
-    
+  ele.addEventListener("change", (event: Event) => {
+    window.localStorage.setItem("keyword", event.target?.value)
+  });
 </script>

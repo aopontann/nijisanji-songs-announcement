@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
-	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -116,9 +115,9 @@ func (j *Job) SongVideoAnnounceJob() error {
 
 	// FCMトークンを取得
 	var tokens []string
-	list, err := j.db.fmcTokens()
+	list, err := j.db.songRegisterFCMTokens()
 	if err != nil {
-		slog.Error("fmcTokens",
+		slog.Error("fcmTokens",
 			slog.String("severity", "ERROR"),
 			slog.String("message", err.Error()),
 		)
@@ -137,7 +136,7 @@ func (j *Job) SongVideoAnnounceJob() error {
 		}
 
 		// push通知
-		err := j.fcm.Send(v, "5分後に公開", tokens, "high")
+		err := j.fcm.Send(v, "song", "5分後に公開", tokens, "high")
 		if err != nil {
 			return err
 		}
@@ -224,29 +223,31 @@ func (j *Job) KeywordAnnounceJob() error {
 	if err != nil {
 		return err
 	}
+	if len(videos) == 0 {
+		return nil
+	}
 
-	list, err := j.db.GetKeywordRegisterList()
+	// FCMトークンを取得
+	var tokens []string
+	list, err := j.db.keywordRegisterFCMTokens()
 	if err != nil {
+		slog.Error("fcmTokens",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
 		return err
+	}
+	for _, user := range list {
+		// ダブルクォーテーションを削除する（fcm.sendが失敗するため）
+		token := strings.Replace(user.Token, `"`, "", 2)
+		tokens = append(tokens, token)
 	}
 
 	for _, v := range videos {
-		for _, r := range list {
-			reg := ".*" + r.Word + ".*"
-			// キーワードに一致した場合
-			if regexp.MustCompile(reg).Match([]byte(v.Title)) {
-				// メール送信
-				err := SendMail("キーワード告知："+r.Word, fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID))
-				if err != nil {
-					return err
-				}
-				// Webpush
-				err = j.fcm.Send(v, "キーワード通知", []string{strings.Replace(r.Token, `"`, "", 2)}, "normal")
-				if err != nil {
-					fmt.Println(err)
-					return err
-				}
-			}
+		// push通知
+		err := j.fcm.Send(v, "keyword", "キーワード通知", tokens, "normal")
+		if err != nil {
+			return err
 		}
 	}
 

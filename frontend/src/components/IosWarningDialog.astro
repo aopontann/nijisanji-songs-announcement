@@ -1,0 +1,21 @@
+<div id="ios-modal-js" class="modal">
+  <div class="modal-background"></div>
+  <div class="modal-content">
+    <div class="box mr-3 ml-3">
+      <h3>にじ通へようこそ！</h3>
+      <p>
+        iPhone, iPad, iPodをお使いの場合、「共有」→「ホーム画面に追加」して、追加されたアイコンから起動してください。<br />
+        詳細は<a href="/how-to">使い方ページ</a>をご確認ください。
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { isIos, isInStandaloneMode } from "../scripts/main";
+  const $iosModalEle = document.getElementById("ios-modal-js") as HTMLElement;
+
+  if (isIos() && !isInStandaloneMode()) {
+    $iosModalEle.classList.add("is-active");
+  }
+</script>

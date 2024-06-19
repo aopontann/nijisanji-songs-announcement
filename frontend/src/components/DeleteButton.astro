@@ -1,0 +1,58 @@
+<button id="delete" class="button">通知解除</button>
+
+<script>
+  import { toast } from "bulma-toast";
+  import { getMessaging, deleteToken } from "firebase/messaging";
+  import { fcmToken } from "../scripts/main";
+
+  const messaging = getMessaging();
+  const deleteEle = document.getElementById("delete") as HTMLElement;
+
+  // 通知解除ボタン
+  deleteEle.addEventListener("click", async () => {
+    console.log("DELETE");
+    // ローディング表示
+    deleteEle.classList.add("is-loading");
+
+    // FCMトークン削除
+    const deleted = await deleteToken(messaging);
+    if (!deleted) {
+      window.alert("トークンの削除に失敗しました");
+      // ローディング解除
+      deleteEle.classList.remove("is-loading");
+    }
+
+    const currentToken = window.localStorage.getItem("fcm-token");
+    window.localStorage.removeItem("fcm-token");
+
+    const res = await fcmToken("DELETE", currentToken);
+    if (!res.ok) {
+      window.alert("トークンの削除に失敗しました");
+      // ローディング解除
+      deleteEle.classList.remove("is-loading");
+    } else {
+      // document.getElementById("toast-success").style.display = "block"
+      // document.getElementById("toast-success").style.visibility = "visible";
+    }
+
+    // ローディング解除
+    deleteEle.classList.remove("is-loading");
+
+    toast({
+      message: "削除成功",
+      type: "is-success",
+      // dismissible: true,
+      pauseOnHover: true,
+      opacity: 5,
+      extraClasses: "mt-6"
+    });
+
+    // 設定初期化
+    const songEle = document.getElementById("checkbox-song") as HTMLElement;
+    const keywordEle = document.getElementById("checkbox-keyword") as HTMLElement;
+    songEle.checked = false;
+    window.localStorage.setItem("checkbox-song", "false")
+    keywordEle.checked = false;
+    window.localStorage.setItem("checkbox-keyword", "false")
+  });
+</script>

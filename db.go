@@ -213,7 +213,7 @@ func (db *DB) songVideos5m() ([]Video, error) {
 	return filtedVideos, nil
 }
 
-func (db *DB) fmcTokens() ([]Result, error) {
+func (db *DB) songRegisterFCMTokens() ([]Result, error) {
 
 	url := os.Getenv("D1_URL")
 	method := "POST"
@@ -222,6 +222,52 @@ func (db *DB) fmcTokens() ([]Result, error) {
 	payload := strings.NewReader(`
   {
     "sql": "SELECT * FROM users WHERE song = 1;"
+  }`)
+
+	client := &http.Client{}
+	req, err := http.NewRequest(method, url, payload)
+
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Authorization", "Bearer "+token)
+
+	res, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	s := &D1Response{}
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	json.Unmarshal(body, s)
+
+	slog.Info(
+		"get-token-d1",
+		slog.String("severity", "INFO"),
+		slog.Any("res", s),
+		slog.String("status_code", res.Status),
+	)
+
+	return s.Result[0].Results, nil
+}
+
+func (db *DB) keywordRegisterFCMTokens() ([]Result, error) {
+
+	url := os.Getenv("D1_URL")
+	method := "POST"
+	token := os.Getenv("D1_TOKEN")
+
+	payload := strings.NewReader(`
+  {
+    "sql": "SELECT * FROM users WHERE keyword = 1;"
   }`)
 
 	client := &http.Client{}
