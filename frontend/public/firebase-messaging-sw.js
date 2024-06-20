@@ -9,12 +9,8 @@ self.addEventListener("notificationclick", (event) => {
   }
 });
 
-importScripts(
-  "https://www.gstatic.com/firebasejs/9.2.0/firebase-app-compat.js",
-);
-importScripts(
-  "https://www.gstatic.com/firebasejs/9.2.0/firebase-messaging-compat.js",
-);
+importScripts("https://www.gstatic.com/firebasejs/9.2.0/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/9.2.0/firebase-messaging-compat.js");
 
 // Initialize the Firebase app in the service worker by passing in
 // your app's Firebase config object.
@@ -40,10 +36,7 @@ const messaging = firebase.messaging();
 // For more info see:
 // https://firebase.google.com/docs/cloud-messaging/concept-options
 messaging.onBackgroundMessage(function (payload) {
-  console.log(
-    "[firebase-messaging-sw.js] Received background message ",
-    payload,
-  );
+  console.log("[firebase-messaging-sw.js] Received background message ", payload);
 
   const notificationTitle = payload.data.title;
   const notificationOptions = {
@@ -82,10 +75,7 @@ const keywordNotification = (payload) => {
       console.log("text:", request.result.text);
       const reg = new RegExp(request.result.text);
       if (reg.test(payload.data.body)) {
-        self.registration.showNotification(
-          notificationTitle,
-          notificationOptions,
-        );
+        self.registration.showNotification(notificationTitle, notificationOptions);
       }
     };
   };
