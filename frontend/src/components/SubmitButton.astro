@@ -26,7 +26,8 @@
 
     const ok = await saveFCMToken(currentToken, {
       song: window.localStorage.getItem("checkbox-song") == "true" ? 1 : 0,
-      word: window.localStorage.getItem("checkbox-keyword") == "true" ? 1 : 0,
+      keyword: window.localStorage.getItem("checkbox-keyword") == "true" ? 1 : 0,
+      keyword_text: window.localStorage.getItem("keyword")
     });
     if (!ok) {
       window.alert("トークンの登録に失敗しました");
