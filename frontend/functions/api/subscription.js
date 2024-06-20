@@ -35,9 +35,9 @@ export async function onRequestPost(context) {
 
   try {
     const res = await context.env.MY_DB.prepare(
-      "INSERT INTO users (token, song, keyword, time) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(token) do update set song = ?2, keyword = ?3",
+      "INSERT INTO users (token, song, keyword, keyword_text) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(token) do update set song = ?2, keyword = ?3, keyword_text = ?4",
     )
-      .bind(token, json.song, json.word, "")
+      .bind(token, json.song, json.keyword, json.keyword_text)
       .run();
     console.log(res);
     if (res.success) return new Response("OK");
