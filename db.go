@@ -2,12 +2,7 @@ package nsa
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -44,36 +39,12 @@ type Video struct {
 type User struct {
 	bun.BaseModel `bun:"table:users"`
 
-	Token     string    `bun:"token,type:varchar(1000),pk"`
-	CreatedAt time.Time `bun:"created_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
-	UpdatedAt time.Time `bun:"updated_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
-}
-
-type Result struct {
-	Token string `json:"token"`
-	Song  int    `json:"song"`
-	Word  string `json:"word"`
-	Time  string `json:"time"`
-}
-
-type D1Response struct {
-	Result []struct {
-		Results []Result `json:"results"`
-		Success bool     `json:"success"`
-		Meta    struct {
-			ServedBy    string  `json:"served_by"`
-			Duration    float64 `json:"duration"`
-			Changes     int     `json:"changes"`
-			LastRowID   int     `json:"last_row_id"`
-			ChangedDb   bool    `json:"changed_db"`
-			SizeAfter   int     `json:"size_after"`
-			RowsRead    int     `json:"rows_read"`
-			RowsWritten int     `json:"rows_written"`
-		} `json:"meta"`
-	} `json:"result"`
-	Success  bool          `json:"success"`
-	Errors   []interface{} `json:"errors"`
-	Messages []interface{} `json:"messages"`
+	Token       string    `json:"token" bun:"token,type:varchar(1000),pk"`
+	Song        bool      `json:"song" bun:"song,default:false,type:boolean"`
+	Keyword     bool      `json:"keyword" bun:"keyword,default:false,type:boolean"`
+	KeywordText string    `json:"keyword_text" bun:"keyword_text,type:varchar(100)"`
+	CreatedAt   time.Time `bun:"created_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
+	UpdatedAt   time.Time `bun:"updated_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
 }
 
 type DB struct {
@@ -213,140 +184,72 @@ func (db *DB) songVideos5m() ([]Video, error) {
 	return filtedVideos, nil
 }
 
-func (db *DB) songRegisterFCMTokens() ([]Result, error) {
-
-	url := os.Getenv("D1_URL")
-	method := "POST"
-	token := os.Getenv("D1_TOKEN")
-
-	payload := strings.NewReader(`
-  {
-    "sql": "SELECT * FROM users WHERE song = 1;"
-  }`)
-
-	client := &http.Client{}
-	req, err := http.NewRequest(method, url, payload)
-
+func (db *DB) getSongTokens() ([]string, error) {
+	// DBからチャンネルID、チャンネルごとの動画数を取得
+	var tokens []string
+	ctx := context.Background()
+	err := db.Service.NewSelect().Model((*User)(nil)).Column("token").Where("song = 1").Scan(ctx, &tokens)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", "Bearer "+token)
 
-	res, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	s := &D1Response{}
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	json.Unmarshal(body, s)
-
-	slog.Info(
-		"get-token-d1",
-		slog.String("severity", "INFO"),
-		slog.Any("res", s),
-		slog.String("status_code", res.Status),
-	)
-
-	return s.Result[0].Results, nil
+	return tokens, nil
 }
 
-func (db *DB) keywordRegisterFCMTokens() ([]Result, error) {
-
-	url := os.Getenv("D1_URL")
-	method := "POST"
-	token := os.Getenv("D1_TOKEN")
-
-	payload := strings.NewReader(`
-  {
-    "sql": "SELECT * FROM users WHERE keyword = 1;"
-  }`)
-
-	client := &http.Client{}
-	req, err := http.NewRequest(method, url, payload)
-
+func (db *DB) getKeywordTextList() ([]string, error) {
+	// DBからチャンネルID、チャンネルごとの動画数を取得
+	var list []string
+	ctx := context.Background()
+	err := db.Service.NewSelect().Model((*User)(nil)).Column("keyword_text").Where("keyword = 1").Group("keyword_text").Scan(ctx, &list)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", "Bearer "+token)
 
-	res, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	s := &D1Response{}
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	json.Unmarshal(body, s)
-
-	slog.Info(
-		"get-token-d1",
-		slog.String("severity", "INFO"),
-		slog.Any("res", s),
-		slog.String("status_code", res.Status),
-	)
-
-	return s.Result[0].Results, nil
+	return list, nil
 }
 
-func (db *DB) GetKeywordRegisterList() ([]Result, error) {
+// func (db *DB) GetKeywordRegisterList() ([]Result, error) {
 
-	url := os.Getenv("D1_URL")
-	method := "POST"
-	token := os.Getenv("D1_TOKEN")
+// 	url := os.Getenv("D1_URL")
+// 	method := "POST"
+// 	token := os.Getenv("D1_TOKEN")
 
-	payload := strings.NewReader(`
-  {
-    "sql": "SELECT * FROM users WHERE not word = '';"
-  }`)
+// 	payload := strings.NewReader(`
+//   {
+//     "sql": "SELECT * FROM users WHERE not word = '';"
+//   }`)
 
-	client := &http.Client{}
-	req, err := http.NewRequest(method, url, payload)
+// 	client := &http.Client{}
+// 	req, err := http.NewRequest(method, url, payload)
 
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", "Bearer "+token)
+// 	if err != nil {
+// 		fmt.Println(err)
+// 		return nil, err
+// 	}
+// 	req.Header.Add("Content-Type", "application/json")
+// 	req.Header.Add("Authorization", "Bearer "+token)
 
-	res, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	defer res.Body.Close()
+// 	res, err := client.Do(req)
+// 	if err != nil {
+// 		fmt.Println(err)
+// 		return nil, err
+// 	}
+// 	defer res.Body.Close()
 
-	s := &D1Response{}
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	json.Unmarshal(body, s)
+// 	s := &D1Response{}
+// 	body, err := io.ReadAll(res.Body)
+// 	if err != nil {
+// 		fmt.Println(err)
+// 		return nil, err
+// 	}
+// 	json.Unmarshal(body, s)
 
-	slog.Info(
-		"get-keyword-d1",
-		slog.String("severity", "INFO"),
-		slog.Any("res", s),
-		slog.String("status_code", res.Status),
-	)
+// 	slog.Info(
+// 		"get-keyword-d1",
+// 		slog.String("severity", "INFO"),
+// 		slog.Any("res", s),
+// 		slog.String("status_code", res.Status),
+// 	)
 
-	return s.Result[0].Results, nil
-}
+// 	return s.Result[0].Results, nil
+// }
