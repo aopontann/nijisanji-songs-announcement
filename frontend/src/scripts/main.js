@@ -3,7 +3,7 @@ export async function fcmToken(method, token) {
   return await fetch("/api/subscription", {
     method,
     cache: "no-cache",
-    headers: { Token: JSON.stringify(token) },
+    headers: { "Authorization": `Bearer: ${token}` },
   });
 }
 
