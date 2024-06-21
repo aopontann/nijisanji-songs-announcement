@@ -2,8 +2,10 @@ package nsa
 
 import (
 	"context"
-	"fmt"
 	"log"
+	"log/slog"
+	"strconv"
+	"strings"
 
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/messaging"
@@ -27,11 +29,10 @@ func NewFCM() *FCM {
 	return &FCM{client}
 }
 
-func (c *FCM) Send(video Video, sendType string, title string, tokens []string, urgency string) error {
+func (c *FCM) SongNotification(video Video, tokens []string) error {
 	message := &messaging.MulticastMessage{
 		Data: map[string]string{
-			"type": sendType,
-			"title": title,
+			"title": "5分後に公開",
 			"body":  video.Title,
 			"url":   "https://youtu.be/" + video.ID,
 			"icon":  video.Thumbnail,
@@ -39,21 +40,133 @@ func (c *FCM) Send(video Video, sendType string, title string, tokens []string, 
 		Tokens: tokens,
 		Webpush: &messaging.WebpushConfig{
 			Headers: map[string]string{
-				"Urgency": urgency,
+				"Urgency": "high",
 			},
 		},
 	}
 
-	fmt.Println("tokens", tokens)
-
 	response, err := c.Client.SendEachForMulticast(context.Background(), message)
 	if err != nil {
+		slog.Error("SongNotification error",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
 		return err
 	}
 	for _, r := range response.Responses {
-		fmt.Println(r)
+		if r.Error != nil {
+			slog.Error("SongNotification warning",
+				slog.String("severity", "WARNING"),
+				slog.String("message", r.Error.Error()),
+			)
+		}
 	}
-	// Response is a message ID string.
-	fmt.Println("Successfully sent message:", response)
 	return nil
+}
+
+func (c *FCM) SongNotification2(video Video, tokens []string) error {
+	message := &messaging.MulticastMessage{
+		Notification: &messaging.Notification{
+			Title: "5分後に公開",
+			Body: video.Title,
+			ImageURL: video.Thumbnail,
+		},
+		Tokens: tokens,
+		Webpush: &messaging.WebpushConfig{
+			Headers: map[string]string{
+				"Urgency": "high",
+			},
+			FCMOptions: &messaging.WebpushFCMOptions{
+				Link: "https://youtu.be/" + video.ID,
+			},
+		},
+	}
+
+	response, err := c.Client.SendEachForMulticast(context.Background(), message)
+	if err != nil {
+		slog.Error("SongNotification error",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
+		return err
+	}
+	for _, r := range response.Responses {
+		if r.Error != nil {
+			slog.Error("SongNotification warning",
+				slog.String("severity", "WARNING"),
+				slog.String("message", r.Error.Error()),
+			)
+		}
+	}
+	return nil
+}
+
+func (c *FCM) SetTopic(token string, topic string) error {
+	ctx := context.Background()
+	res, err := c.Client.SubscribeToTopic(ctx, []string{token}, strToByte(topic))
+	if len(res.Errors) != 0 {
+		slog.Error("SubscribeToTopic warning",
+			slog.String("severity", "WARNING"),
+			slog.String("message", res.Errors[0].Reason),
+		)
+		return nil
+	}
+	if err != nil {
+		slog.Error("SubscribeToTopic error",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
+		return err
+	}
+	return nil
+}
+
+func (c *FCM) DeleteTopic(token string, topic string) error {
+	ctx := context.Background()
+	res, err := c.Client.UnsubscribeFromTopic(ctx, []string{token}, strToByte(topic))
+	if len(res.Errors) != 0 {
+		slog.Error("UnsubscribeFromTopic warning",
+			slog.String("severity", "WARNING"),
+			slog.String("message", res.Errors[0].Reason),
+		)
+		return nil
+	}
+	if err != nil {
+		slog.Error("UnsubscribeFromTopic error",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
+	}
+	return nil
+}
+
+func (c *FCM) KeywordNotification(video Video, topic string) error {
+	ctx := context.Background()
+	message := &messaging.Message{
+		Data: map[string]string{
+			"title": "キーワード通知",
+			"body":  video.Title,
+			"url":   "https://youtu.be/" + video.ID,
+			"icon":  video.Thumbnail,
+		},
+		Topic: strToByte(topic),
+	}
+	_, err := c.Client.Send(ctx, message)
+	if err != nil {
+		slog.Error("KeywordNotification error",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
+		return err
+	}
+	return nil
+}
+
+// topicに日本語が指定できないため、バイト文字列に変換する関数
+func strToByte(text string) string {
+	strList := []string{}
+	for _, b := range []byte(text) {
+		strList = append(strList, strconv.Itoa(int(b)))
+	}
+	return strings.Join(strList, "_")
 }
