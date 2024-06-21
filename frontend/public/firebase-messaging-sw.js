@@ -1,8 +1,8 @@
 self.addEventListener("notificationclick", (event) => {
-  console.log("event.notification:", event.notification);
+  console.log("event:", event);
   try {
     event.notification.close();
-    clients.openWindow(event.notification.data?.url ?? "/");
+    clients.openWindow(event.notification.data.FCM_MSG.notification.click_action ?? "/");
   } catch (e) {
     // デバッグ用なので本番では消してもよいです
     console.error(e);
@@ -35,48 +35,48 @@ const messaging = firebase.messaging();
 // and you should use data messages for custom notifications.
 // For more info see:
 // https://firebase.google.com/docs/cloud-messaging/concept-options
-messaging.onBackgroundMessage(function (payload) {
-  console.log("[firebase-messaging-sw.js] Received background message ", payload);
+// messaging.onBackgroundMessage(function (payload) {
+//   console.log("[firebase-messaging-sw.js] Received background message ", payload);
 
-  const notificationTitle = payload.data.title;
-  const notificationOptions = {
-    body: payload.data.body,
-    icon: payload.data.icon,
-  };
+//   const notificationTitle = payload.data.title;
+//   const notificationOptions = {
+//     body: payload.data.body,
+//     icon: payload.data.icon,
+//   };
 
-  if (payload.data.type === "keyword") {
-    keywordNotification(payload);
-    return;
-  }
+//   if (payload.data.type === "keyword") {
+//     keywordNotification(payload);
+//     return;
+//   }
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
-});
+//   self.registration.showNotification(notificationTitle, notificationOptions);
+// });
 
-const keywordNotification = (payload) => {
-  const notificationTitle = payload.data.title;
-  const notificationOptions = {
-    body: payload.data.body,
-    icon: payload.data.icon,
-  };
+// const keywordNotification = (payload) => {
+//   const notificationTitle = payload.data.title;
+//   const notificationOptions = {
+//     body: payload.data.body,
+//     icon: payload.data.icon,
+//   };
 
-  const openRequest = self.indexedDB.open("niji-tuu", 1);
-  openRequest.onsuccess = function () {
-    console.log("onsuccess");
-    const db = openRequest.result;
-    const transaction = db.transaction("keyword", "readonly");
-    const objectStore = transaction.objectStore("keyword");
-    const request = objectStore.get("1");
+//   const openRequest = self.indexedDB.open("niji-tuu", 1);
+//   openRequest.onsuccess = function () {
+//     console.log("onsuccess");
+//     const db = openRequest.result;
+//     const transaction = db.transaction("keyword", "readonly");
+//     const objectStore = transaction.objectStore("keyword");
+//     const request = objectStore.get("1");
 
-    request.onerror = (event) => {
-      console.log("error:", request);
-    };
-    request.onsuccess = (event) => {
-      // request.result に対して行う処理!
-      console.log("text:", request.result.text);
-      const reg = new RegExp(request.result.text);
-      if (reg.test(payload.data.body)) {
-        self.registration.showNotification(notificationTitle, notificationOptions);
-      }
-    };
-  };
-};
+//     request.onerror = (event) => {
+//       console.log("error:", request);
+//     };
+//     request.onsuccess = (event) => {
+//       // request.result に対して行う処理!
+//       console.log("text:", request.result.text);
+//       const reg = new RegExp(request.result.text);
+//       if (reg.test(payload.data.body)) {
+//         self.registration.showNotification(notificationTitle, notificationOptions);
+//       }
+//     };
+//   };
+// };
