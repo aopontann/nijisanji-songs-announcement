@@ -23,6 +23,9 @@ CREATE TABLE "videos" (
 
 CREATE TABLE "users" (
     "token" varchar(1000) NOT NULL,
+    "song" boolean DEFAULT false,
+    "keyword" boolean DEFAULT false,
+    "keyword_text" varchar(100),
     "created_at" TIMESTAMP(0) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(0) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY ("token")
