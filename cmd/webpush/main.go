@@ -26,16 +26,16 @@ func main() {
 		Content:   "upcoming",
 		Announced: false,
 		StartTime: st,
-		Thumbnail: "https://i.ytimg.com/vi/OPzbUoLxYyE/default.jpg",
+		Thumbnail: "https://i.ytimg.com/vi/0Jh4HIL43uQ/hqdefault_live.jpg",
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
 
 	// fmt.Println(b)
-	tokens := []string{"fJoacu4b1JPNfE2rW73N_R:APA91bFcC-yOj4ZB8J31QHrGGrh1eHUVrxYf4ZkKsmnrzA9O_fbkb_Ml5KP33i7YpvoDT7Wd9MVt6_eMvrHTTfkhdEvgWF3CyTOQvOlWIOvbl84vbD84oiuxDacJWBShXwz52TFlcO7G"}
+	tokens := []string{"fs7MrEyieVJVisNjg32jLp:APA91bFLZdFU53W9k6biHDa19onI7us40J5TrW_SqIp_IRFhUJzCxFu7GLGchWElkWNiwUl-zJnoOn0UG00ZrxF6kaZ0CARKLDxqmLrxY3OexRGTz9GdY7LPX-4MzsCHQ0x7v1EzYh1f"}
 
 	// err := fcm.SetTopic(token, strToByte("石神のぞみ"))
-	err := fcm.SongNotification2(video, tokens)
+	err := fcm.SongNotification(video, tokens)
 	// err := fcm.DeleteTopic(token, strToByte("石神のぞみ"))
 	// err := fcm.SendWithTopic(strToByte("石神のぞみ"))
 	if err != nil {
