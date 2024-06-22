@@ -120,7 +120,7 @@ func (db *DB) SaveVideos(tx bun.Tx, vlist []youtube.Video) error {
 			Duration:  v.ContentDetails.Duration,
 			Content:   v.Snippet.LiveBroadcastContent,
 			Viewers:   Viewers,
-			Thumbnail: v.Snippet.Thumbnails.Default.Url,
+			Thumbnail: v.Snippet.Thumbnails.High.Url,
 			StartTime: t,
 			UpdatedAt: time.Now(),
 		})
@@ -188,7 +188,7 @@ func (db *DB) getSongTokens() ([]string, error) {
 	// DBからチャンネルID、チャンネルごとの動画数を取得
 	var tokens []string
 	ctx := context.Background()
-	err := db.Service.NewSelect().Model((*User)(nil)).Column("token").Where("song = 1").Scan(ctx, &tokens)
+	err := db.Service.NewSelect().Model((*User)(nil)).Column("token").Where("song = true").Scan(ctx, &tokens)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +200,7 @@ func (db *DB) getKeywordTextList() ([]string, error) {
 	// DBからチャンネルID、チャンネルごとの動画数を取得
 	var list []string
 	ctx := context.Background()
-	err := db.Service.NewSelect().Model((*User)(nil)).Column("keyword_text").Where("keyword = 1").Group("keyword_text").Scan(ctx, &list)
+	err := db.Service.NewSelect().Model((*User)(nil)).Column("keyword_text").Where("keyword = true").Group("keyword_text").Scan(ctx, &list)
 	if err != nil {
 		return nil, err
 	}
