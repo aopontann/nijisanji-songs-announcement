@@ -38,8 +38,8 @@ window.onload = async () => {
   }
 
   // 最新の購買情報に応じて要素を変更
-  songEle.checked = data.song == 1;
-  window.localStorage.setItem("checkbox-song", data.song == 1)
-  keywordEle.checked = data.keyword == 1;
-  window.localStorage.setItem("checkbox-keyword", data.keyword == 1);
+  songEle.checked = data.song;
+  window.localStorage.setItem("checkbox-song", data.song)
+  keywordEle.checked = data.keyword;
+  window.localStorage.setItem("checkbox-keyword", data.keyword);
 };

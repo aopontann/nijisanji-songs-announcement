@@ -13,9 +13,6 @@
     // ローディング表示
     submitEle.classList.add("is-loading");
 
-    // キーワードをindexedDBに登録
-    indexedDBSet();
-
     console.log("generate token...");
     const currentToken = await getFCMToken();
     if (currentToken == "") {
@@ -25,8 +22,9 @@
     }
 
     const ok = await saveFCMToken(currentToken, {
-      song: window.localStorage.getItem("checkbox-song") == "true" ? 1 : 0,
-      word: window.localStorage.getItem("checkbox-keyword") == "true" ? 1 : 0,
+      song: window.localStorage.getItem("checkbox-song") == "true",
+      keyword: window.localStorage.getItem("checkbox-keyword") == "true",
+      keyword_text: window.localStorage.getItem("keyword")
     });
     if (!ok) {
       window.alert("トークンの登録に失敗しました");
@@ -43,7 +41,6 @@
     toast({
       message: "登録成功",
       type: "is-success",
-      // dismissible: true,
       pauseOnHover: true,
       opacity: 5,
       extraClasses: "mt-6"
@@ -81,7 +78,7 @@
       cache: "no-cache",
       headers: {
         "Content-Type": "application/json",
-        Token: JSON.stringify(token),
+        "Authorization": `Bearer: ${token}`,
       },
       body: JSON.stringify(data), // 本体のデータ型は "Content-Type" ヘッダーと一致させる必要があります
     });
@@ -89,46 +86,5 @@
     console.log(response.status);
     console.log(response.ok);
     return response.ok;
-  };
-
-  const indexedDBSet = () => {
-    const keyword = window.localStorage.getItem("keyword");
-    if (keyword == null || keyword == "") return;
-
-    const openRequest = window.indexedDB.open("niji-tuu", 1);
-
-    openRequest.onupgradeneeded = function () {
-      console.log("onupgradeneeded");
-      const db = openRequest.result;
-      if (!db.objectStoreNames.contains("keyword")) {
-        console.log("objectStoreNames");
-        db.createObjectStore("keyword", { keyPath: "id" });
-      }
-      // valueSet(db, word)
-    };
-
-    openRequest.onerror = function () {
-      console.error("indexedDB Error");
-      window.alert("indexedDB Error");
-    };
-
-    openRequest.onsuccess = function () {
-      console.log("onsuccess");
-      const db = openRequest.result;
-      valueSet(db, keyword);
-    };
-  };
-
-  const valueSet = (db: IDBDatabase, value: string) => {
-    const transaction = db.transaction("keyword", "readwrite");
-    const store = transaction.objectStore("keyword");
-    const req = store.put({ id: "1", text: value });
-    req.onsuccess = (event) => {
-      // event.target.result === customer.ssn;
-      console.log("onsuccess:", event);
-    };
-    req.onerror = (event) => {
-      console.log("onerror:", event);
-    };
   };
 </script>

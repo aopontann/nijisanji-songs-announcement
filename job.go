@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -114,19 +114,13 @@ func (j *Job) SongVideoAnnounceJob() error {
 	// mk := NewMisskey(os.Getenv("MISSKEY_TOKEN"))
 
 	// FCMトークンを取得
-	var tokens []string
-	list, err := j.db.songRegisterFCMTokens()
+	tokens, err := j.db.getSongTokens()
 	if err != nil {
 		slog.Error("fcmTokens",
 			slog.String("severity", "ERROR"),
 			slog.String("message", err.Error()),
 		)
 		return err
-	}
-	for _, user := range list {
-		// ダブルクォーテーションを削除する（fcm.sendが失敗するため）
-		token := strings.Replace(user.Token, `"`, "", 2)
-		tokens = append(tokens, token)
 	}
 
 	for _, v := range videos {
@@ -136,7 +130,7 @@ func (j *Job) SongVideoAnnounceJob() error {
 		}
 
 		// push通知
-		err := j.fcm.Send(v, "song", "5分後に公開", tokens, "high")
+		err := j.fcm.SongNotification(v, tokens)
 		if err != nil {
 			return err
 		}
@@ -228,26 +222,26 @@ func (j *Job) KeywordAnnounceJob() error {
 	}
 
 	// FCMトークンを取得
-	var tokens []string
-	list, err := j.db.keywordRegisterFCMTokens()
+	keywordTextList, err := j.db.getKeywordTextList()
 	if err != nil {
-		slog.Error("fcmTokens",
+		slog.Error("getKeywordTextList",
 			slog.String("severity", "ERROR"),
 			slog.String("message", err.Error()),
 		)
 		return err
 	}
-	for _, user := range list {
-		// ダブルクォーテーションを削除する（fcm.sendが失敗するため）
-		token := strings.Replace(user.Token, `"`, "", 2)
-		tokens = append(tokens, token)
-	}
-
-	for _, v := range videos {
-		// push通知
-		err := j.fcm.Send(v, "keyword", "キーワード通知", tokens, "normal")
-		if err != nil {
-			return err
+	for _, keywordText := range keywordTextList {
+		reg := ".*" + keywordText + ".*"
+		for _, v := range videos {
+			// キーワードに一致した場合
+			if regexp.MustCompile(reg).Match([]byte(v.Title)) {
+				err := j.fcm.KeywordNotification(v, keywordText)
+				slog.Error("KeywordNotification",
+					slog.String("severity", "ERROR"),
+					slog.String("message", err.Error()),
+				)
+				return err
+			}
 		}
 	}
 
