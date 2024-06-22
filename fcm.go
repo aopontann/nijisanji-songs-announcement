@@ -31,41 +31,6 @@ func NewFCM() *FCM {
 
 func (c *FCM) SongNotification(video Video, tokens []string) error {
 	message := &messaging.MulticastMessage{
-		Data: map[string]string{
-			"title": "5分後に公開",
-			"body":  video.Title,
-			"url":   "https://youtu.be/" + video.ID,
-			"icon":  video.Thumbnail,
-		},
-		Tokens: tokens,
-		Webpush: &messaging.WebpushConfig{
-			Headers: map[string]string{
-				"Urgency": "high",
-			},
-		},
-	}
-
-	response, err := c.Client.SendEachForMulticast(context.Background(), message)
-	if err != nil {
-		slog.Error("SongNotification error",
-			slog.String("severity", "ERROR"),
-			slog.String("message", err.Error()),
-		)
-		return err
-	}
-	for _, r := range response.Responses {
-		if r.Error != nil {
-			slog.Error("SongNotification warning",
-				slog.String("severity", "WARNING"),
-				slog.String("message", r.Error.Error()),
-			)
-		}
-	}
-	return nil
-}
-
-func (c *FCM) SongNotification2(video Video, tokens []string) error {
-	message := &messaging.MulticastMessage{
 		Notification: &messaging.Notification{
 			Title: "5分後に公開",
 			Body: video.Title,
@@ -143,13 +108,17 @@ func (c *FCM) DeleteTopic(token string, topic string) error {
 func (c *FCM) KeywordNotification(video Video, topic string) error {
 	ctx := context.Background()
 	message := &messaging.Message{
-		Data: map[string]string{
-			"title": "キーワード通知",
-			"body":  video.Title,
-			"url":   "https://youtu.be/" + video.ID,
-			"icon":  video.Thumbnail,
+		Notification: &messaging.Notification{
+			Title: "キーワード通知",
+			Body: video.Title,
+			ImageURL: video.Thumbnail,
 		},
 		Topic: strToByte(topic),
+		Webpush: &messaging.WebpushConfig{
+			FCMOptions: &messaging.WebpushFCMOptions{
+				Link: "https://youtu.be/" + video.ID,
+			},
+		},
 	}
 	_, err := c.Client.Send(ctx, message)
 	if err != nil {
