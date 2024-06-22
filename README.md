@@ -1,11 +1,16 @@
-# nijisanji-songs-announcement
-- どんなことに挑戦したか（アプリケーションの特徴）
-- アプリケーションのURL
-- どんなアプリケーションかわかるように、gifや画像を貼る
-- 使っている技術
-- 参考にしたサイト・動画など
+# にじ通
+- にじさんじの動画公開時などに通知をするWEBアプリ
 
-### コマンド
+#### 使用技術
+- Go
+- FCM
+- PostgreSQL
+- Bun
+- atlas
+- Astro
+- Bulma
+- ko
+
 ##### マイグレーション
 ```
 atlas schema apply \
@@ -13,26 +18,27 @@ atlas schema apply \
   --to "file://schema.sql" \
   --dev-url "docker://postgres/16"
 ```
+
 ##### デプロイ
-バッチ処理のAPI
+バッチ
 ```
-gcloud builds submit --pack image=asia-northeast1-docker.pkg.dev/${PROJECT_ID}/buildpacks-docker-repo/nsa-bot,env=GOOGLE_BUILDABLE="cmd/api/main.go"
+ko build ./cmd/batch
 ```
-公開用API
+WEBページ
 ```
-gcloud builds submit --pack image=asia-northeast1-docker.pkg.dev/${PROJECT_ID}/buildpacks-docker-repo/nsa-bot-web,env=GOOGLE_BUILDABLE="cmd/web/main.go"
+ko build ./frontend
 ```
 
 ### メモ
 '''
 export GOOGLE_APPLICATION_CREDENTIALS="token.json"
+export KO_DOCKER_REPO=asia-northeast1-docker.pkg.dev/niji-tuu/buildpacks
+gcloud auth configure-docker asia-northeast1-docker.pkg.dev
+'''
 
-npx wrangler pages dev ./public
-
-npx wrangler pages deploy ./public
-
-nvm install 20
-
-wrangler d1 execute niji-tuu \
-  --local --command "CREATE TABLE IF NOT EXISTS users ( token TEXT PRIMARY KEY, song INTEGER, word TEXT, time TEXT);"
+### DBコンテナ
+'''
+podman run --name some-postgres -e POSTGRES_PASSWORD=mysecretpassword -p 5432:5432 -d docker.io/library/postgres:16
+podman start some-postgres
+podman stop some-postgres
 '''
