@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log"
 	"log/slog"
 	"net/http"
@@ -17,6 +19,7 @@ import (
 	"github.com/uptrace/bun/dialect/pgdialect"
 
 	nsa "github.com/aopontann/nijisanji-songs-announcement"
+
 )
 
 type ReqBody struct {
@@ -25,6 +28,10 @@ type ReqBody struct {
 	KeywordText string `json:"keyword_text"`
 }
 
+//go:embed dist/*
+var dist embed.FS
+
+// test
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger) // 以降、JSON形式で出力される。
@@ -39,7 +46,11 @@ func main() {
 
 	fcm := nsa.NewFCM()
 
-	http.Handle("/", http.FileServer(http.Dir("frontend/dist/")))
+	dist, err := fs.Sub(dist, "dist")
+	if err != nil {
+		panic(err)
+	}
+	http.Handle("/", http.FileServer(http.FS(dist)))
 
 	http.HandleFunc("/api/subscription", func(w http.ResponseWriter, r *http.Request) {
 		if len(r.Header["Authorization"]) == 0 {
@@ -139,7 +150,7 @@ func main() {
 	// Determine port for HTTP service.
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8081"
+		port = "8080"
 	}
 	// Start HTTP server.
 	log.Printf("Listening on port %s", port)
