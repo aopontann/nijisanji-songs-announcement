@@ -236,10 +236,12 @@ func (j *Job) KeywordAnnounceJob() error {
 			// キーワードに一致した場合
 			if regexp.MustCompile(reg).Match([]byte(v.Title)) {
 				err := j.fcm.KeywordNotification(v, keywordText)
-				slog.Error("KeywordNotification",
-					slog.String("severity", "ERROR"),
-					slog.String("message", err.Error()),
-				)
+				if err != nil {
+					slog.Error("KeywordNotification",
+						slog.String("severity", "ERROR"),
+						slog.String("message", err.Error()),
+					)
+				}
 				return err
 			}
 		}
