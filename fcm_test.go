@@ -14,7 +14,6 @@ func TestSend(t *testing.T) {
 		Duration:  "PT3M24S",
 		Viewers:   0,
 		Content:   "upcoming",
-		Announced: false,
 		StartTime: st,
 		Thumbnail: "https://i.ytimg.com/vi/OPzbUoLxYyE/default.jpg",
 		CreatedAt: time.Now(),
