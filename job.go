@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"regexp"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -66,7 +67,7 @@ func (j *Job) CheckNewVideoJob() error {
 	}
 
 	// フィルター
-	filtedVideos := j.yt.FilterVideos(videos)
+	// filtedVideos := j.yt.FilterVideos(videos)
 
 	// トランザクション開始
 	ctx := context.Background()
@@ -82,7 +83,8 @@ func (j *Job) CheckNewVideoJob() error {
 	}
 
 	// 動画情報をDBに登録
-	err = j.db.SaveVideos(tx, filtedVideos)
+	// 登録済みの動画は無視
+	err = j.db.SaveVideos(tx, videos)
 	if err != nil {
 		return err
 	}
@@ -91,6 +93,28 @@ func (j *Job) CheckNewVideoJob() error {
 	err = tx.Commit()
 	if err != nil {
 		return err
+	}
+
+	// 歌みた動画か判別しづらい動画をメールに送信する
+	for _, v := range videos {
+		for _, word := range getSongWordList() {
+			if strings.Contains(strings.ToLower(v.Snippet.Title), strings.ToLower(word)) {
+				continue
+			}
+		}
+		if v.LiveStreamingDetails == nil {
+			continue
+		}
+		if v.Snippet.LiveBroadcastContent != "upcoming" {
+			continue
+		}
+		if v.ContentDetails.Duration == "P0D" {
+			continue
+		}
+		err := SendMail("歌みた動画判定", v.Id)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
