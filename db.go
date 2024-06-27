@@ -200,7 +200,7 @@ func (db *DB) getKeywordTextList() ([]string, error) {
 	// DBからチャンネルID、チャンネルごとの動画数を取得
 	var list []string
 	ctx := context.Background()
-	err := db.Service.NewSelect().Model((*User)(nil)).Column("keyword_text").Where("keyword = true").Group("keyword_text").Scan(ctx, &list)
+	err := db.Service.NewSelect().Model((*User)(nil)).Column("keyword_text").Where("keyword = true").Where("keyword_text != ''").Group("keyword_text").Scan(ctx, &list)
 	if err != nil {
 		return nil, err
 	}
