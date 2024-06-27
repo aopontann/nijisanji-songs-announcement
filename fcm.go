@@ -70,7 +70,7 @@ func (c *FCM) SetTopic(token string, topic string) error {
 	ctx := context.Background()
 	res, err := c.Client.SubscribeToTopic(ctx, []string{token}, strToByte(topic))
 	if len(res.Errors) != 0 {
-		slog.Error("SubscribeToTopic warning",
+		slog.Warn("SubscribeToTopic warning",
 			slog.String("severity", "WARNING"),
 			slog.String("message", res.Errors[0].Reason),
 		)
@@ -90,7 +90,7 @@ func (c *FCM) DeleteTopic(token string, topic string) error {
 	ctx := context.Background()
 	res, err := c.Client.UnsubscribeFromTopic(ctx, []string{token}, strToByte(topic))
 	if len(res.Errors) != 0 {
-		slog.Error("UnsubscribeFromTopic warning",
+		slog.Warn("UnsubscribeFromTopic warning",
 			slog.String("severity", "WARNING"),
 			slog.String("message", res.Errors[0].Reason),
 		)
