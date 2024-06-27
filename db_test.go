@@ -136,6 +136,37 @@ func TestGetKeywordTextList(t *testing.T) {
 	}
 }
 
+func TestSongVideos5m(t *testing.T) {
+	bunDB := setup()
+	defer bunDB.Close()
+	db := NewDB(bunDB)
+	ctx := context.Background()
+
+	videos := []Video{
+		{ID: "aaa", Title: "MV", Duration: "PT4M", Song: false, Viewers: 0, Content: "upcoming", StartTime: time.Date(2024, 6, 27, 12, 10, 0, 0, time.UTC)},
+		{ID: "bbb", Title: "aaa", Duration: "PT4M", Song: false, Viewers: 0, Content: "upcoming", StartTime: time.Date(2024, 6, 27, 12, 10, 0, 0, time.UTC)},
+		{ID: "ccc", Title: "歌ってみた", Duration: "PT4M", Song: false, Viewers: 0, Content: "upcoming", StartTime: time.Date(2024, 6, 27, 12, 10, 0, 0, time.UTC)},
+		{ID: "ddd", Title: "bbb", Duration: "PT4M", Song: true, Viewers: 0, Content: "upcoming", StartTime: time.Date(2024, 6, 27, 12, 10, 0, 0, time.UTC)},
+	}
+
+	_, err := bunDB.NewInsert().Model(&videos).Exec(ctx)
+	if err != nil {
+		t.Error(err)
+	}
+
+	res, err := db.songVideos5m()
+	if err != nil {
+		t.Error(err)
+	}
+	for _, v := range res {
+		fmt.Println(v.Title)
+	}
+	_, err = bunDB.NewDelete().Model(&videos).WherePK().Exec(ctx)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 // 動画が登録されているか
 
 func setup() *bun.DB {
