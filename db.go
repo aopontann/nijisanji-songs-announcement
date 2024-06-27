@@ -3,7 +3,6 @@ package nsa
 import (
 	"context"
 	"log/slog"
-	"regexp"
 	"strings"
 	"time"
 
@@ -26,10 +25,10 @@ type Video struct {
 
 	ID        string    `bun:"id,type:varchar(11),pk"`
 	Title     string    `bun:"title,notnull,type:varchar"`
-	Duration  string    `bun:"duration,notnull,type:varchar"` //int型に変換したほうがいいか？
+	Duration  string    `bun:"duration,notnull,type:varchar"`
+	Song      bool      `bun:"song,default:false,type:boolean"`
 	Viewers   int64     `bun:"viewers,notnull,type:integer"`
 	Content   string    `bun:"content,notnull,type:varchar"`
-	Announced bool      `bun:"announced,default:false,type:boolean"`
 	StartTime time.Time `bun:"scheduled_start_time,type:timestamp"`
 	Thumbnail string    `bun:"thumbnail,notnull,type:varchar"`
 	CreatedAt time.Time `bun:"created_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
@@ -49,6 +48,10 @@ type User struct {
 
 type DB struct {
 	Service *bun.DB
+}
+
+func getSongWordList() []string {
+	return []string{"cover", "歌って", "歌わせて", "Original Song", "オリジナル曲", "オリジナル楽曲", "オリジナルソング", "MV", "Music Video"}
 }
 
 func NewDB(db *bun.DB) *DB {
@@ -146,7 +149,12 @@ func (db *DB) songVideos5m() ([]Video, error) {
 	tAfter := now.Add(1 * time.Second)
 	tBefore := now.Add(5 * time.Minute)
 	var videos []Video
-	err := db.Service.NewSelect().Model(&videos).Where("? BETWEEN ? AND ?", bun.Ident("scheduled_start_time"), tAfter, tBefore).Scan(ctx)
+	err := db.Service.NewSelect().
+		Model(&videos).
+		Where("? BETWEEN ? AND ?", bun.Ident("scheduled_start_time"), tAfter, tBefore).
+		Where("duration != 'P0D'").
+		Where("content = 'upcoming'").
+		Scan(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -158,27 +166,16 @@ func (db *DB) songVideos5m() ([]Video, error) {
 	var filtedVideos []Video
 
 	for _, v := range videos {
-		// 放送前の動画か
-		if v.Content != "upcoming" {
+		if v.Song {
+			filtedVideos = append(filtedVideos, v)
 			continue
 		}
-		// 動画の長さが10分未満か
-		if !regexp.MustCompile(`^PT([1-9]M[1-5]?[0-9]S|[1-5]?[0-9]S)`).Match([]byte(v.Duration)) {
-			continue
+		for _, word := range getSongWordList() {
+			if strings.Contains(strings.ToLower(v.Title), strings.ToLower(word)) {
+				filtedVideos = append(filtedVideos, v)
+				continue
+			}
 		}
-		// 切り抜き動画ではないか
-		if regexp.MustCompile(`.*切り抜き.*`).Match([]byte(v.Title)) {
-			continue
-		}
-		// ショート動画ではないか
-		if regexp.MustCompile(`.*shorts.*`).Match([]byte(v.Title)) {
-			continue
-		}
-		// 試聴動画ではないか
-		if regexp.MustCompile(`.*試聴.*`).Match([]byte(v.Title)) {
-			continue
-		}
-		filtedVideos = append(filtedVideos, v)
 	}
 
 	return filtedVideos, nil
