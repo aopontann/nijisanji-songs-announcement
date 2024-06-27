@@ -134,9 +134,6 @@ func (j *Job) SongVideoAnnounceJob() error {
 		return nil
 	}
 
-	// tw := NewTwitter()
-	// mk := NewMisskey(os.Getenv("MISSKEY_TOKEN"))
-
 	// FCMトークンを取得
 	tokens, err := j.db.getSongTokens()
 	if err != nil {
