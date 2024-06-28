@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"regexp"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -97,10 +96,8 @@ func (j *Job) CheckNewVideoJob() error {
 
 	// 歌みた動画か判別しづらい動画をメールに送信する
 	for _, v := range videos {
-		for _, word := range getSongWordList() {
-			if strings.Contains(strings.ToLower(v.Snippet.Title), strings.ToLower(word)) {
-				continue
-			}
+		if j.yt.FindSongKeyword(v) {
+			continue
 		}
 		if v.LiveStreamingDetails == nil {
 			continue
@@ -111,6 +108,11 @@ func (j *Job) CheckNewVideoJob() error {
 		if v.ContentDetails.Duration == "P0D" {
 			continue
 		}
+		// 特定のキーワードを含んでいる場合
+		if j.yt.FindIgnoreKeyword(v) {
+			continue
+		}
+
 		err := SendMail("歌みた動画判定", v.Id)
 		if err != nil {
 			return err
