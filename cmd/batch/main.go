@@ -11,11 +11,16 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/joho/godotenv"
 )
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger) // 以降、JSON形式で出力される。
+
+	if os.Getenv("ENV") != "prod" {
+		godotenv.Load(".env")
+	}
 
 	config, err := pgx.ParseConfig(os.Getenv("DSN"))
 	if err != nil {
