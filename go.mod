@@ -4,11 +4,7 @@ go 1.21
 
 require google.golang.org/api v0.170.0
 
-require (
-	github.com/SherClockHolmes/webpush-go v1.3.0
-	github.com/dghubble/oauth1 v0.7.2
-	github.com/uptrace/bun v1.1.17
-)
+require github.com/uptrace/bun v1.1.17
 
 require (
 	cloud.google.com/go v0.112.1 // indirect
@@ -21,7 +17,6 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
 	github.com/google/uuid v1.6.0 // indirect
