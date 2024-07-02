@@ -66,7 +66,7 @@ func (j *Job) CheckNewVideoJob() error {
 	}
 
 	// フィルター
-	filtedVideos := j.yt.FilterVideos(videos)
+	// filtedVideos := j.yt.FilterVideos(videos)
 
 	// トランザクション開始
 	ctx := context.Background()
@@ -82,7 +82,8 @@ func (j *Job) CheckNewVideoJob() error {
 	}
 
 	// 動画情報をDBに登録
-	err = j.db.SaveVideos(tx, filtedVideos)
+	// 登録済みの動画は無視
+	err = j.db.SaveVideos(tx, videos)
 	if err != nil {
 		return err
 	}
@@ -91,6 +92,31 @@ func (j *Job) CheckNewVideoJob() error {
 	err = tx.Commit()
 	if err != nil {
 		return err
+	}
+
+	// 歌みた動画か判別しづらい動画をメールに送信する
+	for _, v := range videos {
+		if j.yt.FindSongKeyword(v) {
+			continue
+		}
+		if v.LiveStreamingDetails == nil {
+			continue
+		}
+		if v.Snippet.LiveBroadcastContent != "upcoming" {
+			continue
+		}
+		if v.ContentDetails.Duration == "P0D" {
+			continue
+		}
+		// 特定のキーワードを含んでいる場合
+		if j.yt.FindIgnoreKeyword(v) {
+			continue
+		}
+
+		err := SendMail("歌みた動画判定", v.Id)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -109,9 +135,6 @@ func (j *Job) SongVideoAnnounceJob() error {
 	if len(videos) == 0 {
 		return nil
 	}
-
-	// tw := NewTwitter()
-	// mk := NewMisskey(os.Getenv("MISSKEY_TOKEN"))
 
 	// FCMトークンを取得
 	tokens, err := j.db.getSongTokens()

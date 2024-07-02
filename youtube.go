@@ -156,3 +156,23 @@ func (y *Youtube) FilterVideos(vlist []youtube.Video) []youtube.Video {
 
 	return filtedVideoList
 }
+
+// 歌ってみた動画のタイトルによく含まれるキーワードが 指定した動画に含まれているか
+func (y *Youtube) FindSongKeyword(video youtube.Video) bool {
+	for _, word := range getSongWordList() {
+		if strings.Contains(strings.ToLower(video.Snippet.Title), strings.ToLower(word)) {
+			return true
+		}
+	}
+	return false
+}
+
+// 無視するキーワードが 指定した動画に含まれているか
+func (y *Youtube) FindIgnoreKeyword(video youtube.Video) bool {
+	for _, word := range []string{"切り抜き", "ラジオ"} {
+		if strings.Contains(strings.ToLower(video.Snippet.Title), strings.ToLower(word)) {
+			return true
+		}
+	}
+	return false
+}

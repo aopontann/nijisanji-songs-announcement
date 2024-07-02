@@ -24,7 +24,6 @@ func main() {
 		Duration:  "PT3M24S",
 		Viewers:   0,
 		Content:   "upcoming",
-		Announced: false,
 		StartTime: st,
 		Thumbnail: "https://i.ytimg.com/vi/0Jh4HIL43uQ/hqdefault_live.jpg",
 		CreatedAt: time.Now(),

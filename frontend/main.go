@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"embed"
 	"encoding/json"
-	"fmt"
 	"io/fs"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -19,7 +19,6 @@ import (
 	"github.com/uptrace/bun/dialect/pgdialect"
 
 	nsa "github.com/aopontann/nijisanji-songs-announcement"
-
 )
 
 type ReqBody struct {
@@ -58,7 +57,6 @@ func main() {
 			return
 		}
 		token := strings.Split(r.Header["Authorization"][0], " ")[1]
-		fmt.Println("token:", token)
 
 		if r.Method == http.MethodGet {
 			getHandler(w, token, db, ctx)
@@ -68,11 +66,17 @@ func main() {
 		if r.Method == http.MethodPost {
 			var b ReqBody
 			if err = json.NewDecoder(r.Body).Decode(&b); err != nil {
-				slog.Error("insert token error",
+				slog.Error("NewDecoder error",
 					slog.String("severity", "ERROR"),
 					slog.String("message", err.Error()),
 				)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(w, "リクエストボディが不正です", http.StatusInternalServerError)
+				return
+			}
+
+			// バリデーション処理
+			if utf8.RuneCountInString(b.KeywordText) > 20 {
+				http.Error(w, "21文字以上のキーワードは登録できません", http.StatusBadRequest)
 				return
 			}
 
@@ -83,13 +87,26 @@ func main() {
 					Model(&nsa.User{Token: token, Song: b.Song, Keyword: b.Keyword, KeywordText: b.KeywordText}).
 					Exec(ctx)
 				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					slog.Error("NewInsert error",
+						slog.String("severity", "ERROR"),
+						slog.String("message", err.Error()),
+						slog.String("token", token),
+					)
+					http.Error(w, "登録に失敗しました。", http.StatusInternalServerError)
 					return
 				}
-				err = fcm.SetTopic(token, b.KeywordText)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
+				if user.Keyword && user.KeywordText != "" {
+					err = fcm.SetTopic(token, b.KeywordText)
+					if err != nil {
+						slog.Error("SetTopic error",
+							slog.String("severity", "ERROR"),
+							slog.String("message", err.Error()),
+							slog.String("token", token),
+							slog.String("topic", b.KeywordText),
+						)
+						http.Error(w, "キーワードの登録に失敗しました", http.StatusInternalServerError)
+						return
+					}
 				}
 				return
 			}
@@ -97,32 +114,52 @@ func main() {
 				slog.Error("select user error",
 					slog.String("severity", "ERROR"),
 					slog.String("message", err.Error()),
+					slog.String("token", token),
 				)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(w, "ユーザ情報の取得に失敗しました", http.StatusInternalServerError)
 				return
 			}
 
 			// 変更の場合
-
-			err = fcm.DeleteTopic(token, user.KeywordText)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
+			if !b.Keyword || user.KeywordText != "" {
+				err = fcm.DeleteTopic(token, user.KeywordText)
+				if err != nil {
+					slog.Error("DeleteTopic error",
+						slog.String("severity", "ERROR"),
+						slog.String("message", err.Error()),
+						slog.String("token", token),
+						slog.String("topic", user.KeywordText),
+					)
+					http.Error(w, "キーワードの更新に失敗しました", http.StatusInternalServerError)
+					return
+				}
 			}
-
-			err = fcm.SetTopic(token, b.KeywordText)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
+			if b.Keyword && b.KeywordText != "" {
+				err = fcm.SetTopic(token, b.KeywordText)
+				if err != nil {
+					slog.Error("Delete & SetTopic error",
+						slog.String("severity", "ERROR"),
+						slog.String("message", err.Error()),
+						slog.String("token", token),
+						slog.String("before_topic", user.KeywordText),
+						slog.String("after_topic", b.KeywordText),
+					)
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
 			}
 
 			_, err = db.NewUpdate().
 				Model(&nsa.User{Token: token, Song: b.Song, Keyword: b.Keyword, KeywordText: b.KeywordText}).
+				Column("song", "keyword", "keyword_text").
 				WherePK().Exec(ctx)
 			if err != nil {
 				slog.Error("update user error",
 					slog.String("severity", "ERROR"),
 					slog.String("message", err.Error()),
+					slog.String("token", token),
+					slog.String("before_topic", user.KeywordText),
+					slog.String("after_topic", b.KeywordText),
 				)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -139,7 +176,7 @@ func main() {
 					slog.String("severity", "ERROR"),
 					slog.String("message", err.Error()),
 				)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(w, "削除に失敗しました", http.StatusInternalServerError)
 				return
 			}
 			w.Write([]byte("OK!!"))
