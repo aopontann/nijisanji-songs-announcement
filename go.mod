@@ -4,7 +4,10 @@ go 1.21
 
 require google.golang.org/api v0.170.0
 
-require github.com/uptrace/bun v1.1.17
+require (
+	github.com/avast/retry-go v3.0.0+incompatible
+	github.com/uptrace/bun v1.1.17
+)
 
 require (
 	cloud.google.com/go v0.112.1 // indirect
@@ -14,7 +17,6 @@ require (
 	cloud.google.com/go/longrunning v0.5.5 // indirect
 	cloud.google.com/go/storage v1.40.0 // indirect
 	github.com/MicahParks/keyfunc v1.9.0 // indirect
-	github.com/avast/retry-go v3.0.0+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
