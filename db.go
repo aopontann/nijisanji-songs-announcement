@@ -3,6 +3,7 @@ package nsa
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -140,6 +141,44 @@ func (db *DB) SaveVideos(tx bun.Tx, vlist []youtube.Video) error {
 	}
 
 	return nil
+}
+
+func (db *DB) NotExistsVideos(videos []youtube.Video) ([]youtube.Video, error) {
+	ctx := context.Background()
+	// IN句に使用する動画IDリスト
+	var sids []string
+	for _, v := range videos {
+		sids = append(sids, v.Id)
+	}
+
+	// 既に存在している動画IDリスト
+	var ids []string 
+	err := db.Service.NewSelect().Model((*Video)(nil)).Column("id").Where("id IN (?)", bun.In(sids)).Scan(ctx, &ids)
+	if err != nil {
+		slog.Error("NotExistsVideos",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
+		return nil, err
+	}
+
+	// 存在していない動画IDリスト
+	var nids []string
+	for _, sid := range sids {
+		if !slices.Contains(ids, sid) {
+			nids = append(nids, sid)
+		}
+	}
+
+	// 存在していない動画情報リスト
+	var nvideos []youtube.Video
+	for _, v := range videos {
+		if slices.Contains(nids, v.Id) {
+			nvideos = append(nvideos, v)
+		}
+	}
+
+	return nvideos, nil
 }
 
 // 5分後にプレミア公開される動画を取得
