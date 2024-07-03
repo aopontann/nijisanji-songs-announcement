@@ -9,6 +9,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/avast/retry-go"
 	"github.com/uptrace/bun"
 )
 
@@ -65,33 +66,36 @@ func (j *Job) CheckNewVideoJob() error {
 		return err
 	}
 
-	// フィルター
-	// filtedVideos := j.yt.FilterVideos(videos)
-
-	// トランザクション開始
-	ctx := context.Background()
-	tx, err := j.db.Service.BeginTx(ctx, &sql.TxOptions{})
+	// 歌ってみた動画ゲリラ対応
+	notExistsVideos, err := j.db.NotExistsVideos(videos)
 	if err != nil {
 		return err
 	}
-
-	// DBのプレイリスト動画数を更新
-	err = j.db.UpdatePlaylistItem(tx, newPlaylists)
-	if err != nil {
-		return err
-	}
-
-	// 動画情報をDBに登録
-	// 登録済みの動画は無視
-	err = j.db.SaveVideos(tx, videos)
-	if err != nil {
-		return err
-	}
-
-	// コミット
-	err = tx.Commit()
-	if err != nil {
-		return err
+	for _, v := range notExistsVideos {
+		// プレミア公開、生放送終了した動画
+		if v.LiveStreamingDetails != nil && v.Snippet.LiveBroadcastContent == "none" {
+			continue
+		}
+		if !j.yt.FindSongKeyword(v) && j.yt.FindIgnoreKeyword(v) {
+			continue
+		}
+		// 5分以内に公開される動画
+		sst, _ := time.Parse("2006-01-02T15:04:05Z", v.LiveStreamingDetails.ScheduledStartTime)
+		if time.Now().UTC().Sub(sst).Minutes() < 5 {
+			tokens, err := j.db.getSongTokens()
+			if err != nil {
+				return err
+			}
+			j.fcm.Notification(
+				"まもなく公開",
+				Video{
+					ID:        v.Id,
+					Title:     v.Snippet.Title,
+					Thumbnail: v.Snippet.Thumbnails.High.Url,
+				},
+				tokens,
+			)
+		}
 	}
 
 	// 歌みた動画か判別しづらい動画をメールに送信する
@@ -117,6 +121,46 @@ func (j *Job) CheckNewVideoJob() error {
 		if err != nil {
 			return err
 		}
+	}
+
+	// 3回までリトライ　1秒後にリトライ
+	err = retry.Do(
+		func() error {
+			// トランザクション開始
+			ctx := context.Background()
+			tx, err := j.db.Service.BeginTx(ctx, &sql.TxOptions{})
+			if err != nil {
+				return err
+			}
+
+			// DBのプレイリスト動画数を更新
+			err = j.db.UpdatePlaylistItem(tx, newPlaylists)
+			if err != nil {
+				tx.Rollback()
+				return err
+			}
+
+			// 動画情報をDBに登録
+			// 登録済みの動画は無視
+			err = j.db.SaveVideos(tx, videos)
+			if err != nil {
+				tx.Rollback()
+				return err
+			}
+
+			// コミット
+			err = tx.Commit()
+			if err != nil {
+				tx.Rollback()
+				return err
+			}
+			return nil
+		},
+		retry.Attempts(3),
+		retry.Delay(1*time.Second),
+	)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -153,24 +197,10 @@ func (j *Job) SongVideoAnnounceJob() error {
 		}
 
 		// push通知
-		err := j.fcm.SongNotification(v, tokens)
+		err := j.fcm.Notification("5分後に公開", v, tokens)
 		if err != nil {
 			return err
 		}
-
-		// ツイート
-		// err = tw.Id(v.ID).Title(v.Title).Tweet()
-		// if err != nil {
-		// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-		// 	return
-		// }
-
-		// Missky post
-		// err = mk.Post(v.ID, v.Title)
-		// if err != nil {
-		// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-		// 	return
-		// }
 	}
 	return nil
 }
@@ -258,9 +288,9 @@ func (j *Job) KeywordAnnounceJob() error {
 		for _, v := range videos {
 			// キーワードに一致した場合
 			if regexp.MustCompile(reg).Match([]byte(v.Title)) {
-				err := j.fcm.KeywordNotification(v, keywordText)
+				err := j.fcm.TopicNotification(v, keywordText)
 				if err != nil {
-					slog.Error("KeywordNotification",
+					slog.Error("TopicNotification",
 						slog.String("severity", "ERROR"),
 						slog.String("message", err.Error()),
 					)
