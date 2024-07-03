@@ -20,7 +20,8 @@ func TestSend(t *testing.T) {
 		UpdatedAt: time.Now(),
 	}
 
-	err := fcm.SongNotification(
+	err := fcm.Notification(
+		"5分後に公開",
 		video,
 		[]string{
 			"cXPUH6Zl18wtzVCAPI7KaE:APA91bGW4wQ3-k2PgHbEeQzod54NVhK6hwIA9GdfZZyTDt5uE9NJTLSP_QonuDm808bNz8rGHdFCvXeB1_TB9CaEIXnlDAJ5Cu5OW0VyBNV8ezQLaGeDw-eqGVTPavSP2sKvWdfNFktI",

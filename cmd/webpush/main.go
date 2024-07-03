@@ -34,7 +34,7 @@ func main() {
 	tokens := []string{"fs7MrEyieVJVisNjg32jLp:APA91bFLZdFU53W9k6biHDa19onI7us40J5TrW_SqIp_IRFhUJzCxFu7GLGchWElkWNiwUl-zJnoOn0UG00ZrxF6kaZ0CARKLDxqmLrxY3OexRGTz9GdY7LPX-4MzsCHQ0x7v1EzYh1f"}
 
 	// err := fcm.SetTopic(token, strToByte("石神のぞみ"))
-	err := fcm.SongNotification(video, tokens)
+	err := fcm.Notification("5分後に公開", video, tokens)
 	// err := fcm.DeleteTopic(token, strToByte("石神のぞみ"))
 	// err := fcm.SendWithTopic(strToByte("石神のぞみ"))
 	if err != nil {
