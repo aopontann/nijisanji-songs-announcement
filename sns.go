@@ -1,12 +1,39 @@
 package nsa
 
 import (
+	"fmt"
 	"log/slog"
 	"net/smtp"
 	"os"
 )
 
-func SendMail(subject string, message string) error {
+type Mail struct {
+	subject string
+	id      string
+	title   string
+}
+
+func NewMail() *Mail {
+	return &Mail{}
+}
+
+func (m *Mail) Subject(s string) *Mail {
+	m.subject = s
+	return m
+}
+
+func (m *Mail) Id(id string) *Mail {
+	m.id = id
+	return m
+}
+
+func (m *Mail) Title(t string) *Mail {
+	m.title = t
+	return m
+}
+
+func (m *Mail) Send() error {
+	msg := "title: " + m.title + "\r\n" + "URL: " + fmt.Sprintf("https://www.youtube.com/watch?v=%s", m.id)
 	addr := os.Getenv("MAIL_ADDRESS")
 	auth := smtp.PlainAuth(
 		"",
@@ -18,8 +45,8 @@ func SendMail(subject string, message string) error {
 	slog.Info(
 		"send-mail",
 		slog.String("severity", "INFO"),
-		slog.String("subject", subject),
-		slog.String("message", message),
+		slog.String("subject", m.subject),
+		slog.String("message", msg),
 	)
 
 	return smtp.SendMail(
@@ -29,8 +56,8 @@ func SendMail(subject string, message string) error {
 		[]string{addr}, // 送信先
 		[]byte(
 			"To: "+addr+"\r\n"+
-				"Subject:"+subject+"\r\n"+
+				"Subject:"+m.subject+"\r\n"+
 				"\r\n"+
-				message+"\r\n"),
+				msg+"\r\n"),
 	)
 }
