@@ -15,6 +15,12 @@ type FCM struct {
 	Client *messaging.Client
 }
 
+type NotificationVideo struct {
+	ID        string
+	Title     string
+	Thumbnail string
+}
+
 func NewFCM() *FCM {
 	ctx := context.Background()
 	app, err := firebase.NewApp(context.Background(), nil)
@@ -29,7 +35,7 @@ func NewFCM() *FCM {
 	return &FCM{client}
 }
 
-func (c *FCM) Notification(title string, video Video, tokens []string) error {
+func (c *FCM) Notification(title string, tokens []string, video *NotificationVideo) error {
 	message := &messaging.MulticastMessage{
 		Notification: &messaging.Notification{
 			Title:    title,
@@ -105,7 +111,7 @@ func (c *FCM) DeleteTopic(token string, topic string) error {
 	return nil
 }
 
-func (c *FCM) TopicNotification(video Video, topic string) error {
+func (c *FCM) TopicNotification(topic string, video *NotificationVideo) error {
 	ctx := context.Background()
 	message := &messaging.Message{
 		Notification: &messaging.Notification{
