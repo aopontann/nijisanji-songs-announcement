@@ -3,7 +3,6 @@ package nsa
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log/slog"
 	"regexp"
 	"slices"
@@ -72,29 +71,30 @@ func (j *Job) CheckNewVideoJob() error {
 		return err
 	}
 	for _, v := range notExistsVideos {
-		// プレミア公開、生放送終了した動画
-		if v.LiveStreamingDetails != nil && v.Snippet.LiveBroadcastContent == "none" {
+		// 5分以内に公開される動画ではない場合
+		if !j.yt.IsStartWithin5m(v) {
 			continue
 		}
-		if !j.yt.FindSongKeyword(v) && j.yt.FindIgnoreKeyword(v) {
+		// 歌ってみた動画に含まれているキーワードが含まれていない　除外キーワードが含まれている場合
+		if !j.yt.FindSongKeyword(v) || j.yt.FindIgnoreKeyword(v) {
 			continue
 		}
-		// 5分以内に公開される動画
-		sst, _ := time.Parse("2006-01-02T15:04:05Z", v.LiveStreamingDetails.ScheduledStartTime)
-		if time.Now().UTC().Sub(sst).Minutes() < 5 {
-			tokens, err := j.db.getSongTokens()
-			if err != nil {
-				return err
-			}
-			j.fcm.Notification(
-				"まもなく公開",
-				Video{
-					ID:        v.Id,
-					Title:     v.Snippet.Title,
-					Thumbnail: v.Snippet.Thumbnails.High.Url,
-				},
-				tokens,
-			)
+
+		tokens, err := j.db.getSongTokens()
+		if err != nil {
+			return err
+		}
+		err = j.fcm.Notification(
+			"まもなく公開",
+			tokens,
+			&NotificationVideo{
+				ID:        v.Id,
+				Title:     v.Snippet.Title,
+				Thumbnail: v.Snippet.Thumbnails.High.Url,
+			},
+		)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -117,7 +117,7 @@ func (j *Job) CheckNewVideoJob() error {
 			continue
 		}
 
-		err := SendMail("歌みた動画判定", v.Id)
+		err := NewMail().Subject("歌みた動画判定").Id(v.Id).Title(v.Snippet.Title).Send()
 		if err != nil {
 			return err
 		}
@@ -191,13 +191,20 @@ func (j *Job) SongVideoAnnounceJob() error {
 	}
 
 	for _, v := range videos {
-		err = SendMail("検証 5分後に公開", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID))
+		err := NewMail().Subject("歌みた動画判定").Id(v.ID).Title(v.Title).Send()
 		if err != nil {
 			return err
 		}
 
 		// push通知
-		err := j.fcm.Notification("5分後に公開", v, tokens)
+		err = j.fcm.Notification(
+			"5分後に公開",
+			tokens,
+			&NotificationVideo{
+				ID:        v.ID,
+				Title:     v.Title,
+				Thumbnail: v.Thumbnail,
+			})
 		if err != nil {
 			return err
 		}
@@ -288,7 +295,11 @@ func (j *Job) KeywordAnnounceJob() error {
 		for _, v := range videos {
 			// キーワードに一致した場合
 			if regexp.MustCompile(reg).Match([]byte(v.Title)) {
-				err := j.fcm.TopicNotification(v, keywordText)
+				err := j.fcm.TopicNotification(keywordText, &NotificationVideo{
+					ID:        v.ID,
+					Title:     v.Title,
+					Thumbnail: v.Thumbnail,
+				})
 				if err != nil {
 					slog.Error("TopicNotification",
 						slog.String("severity", "ERROR"),
