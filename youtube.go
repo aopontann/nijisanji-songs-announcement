@@ -157,6 +157,19 @@ func (y *Youtube) FilterVideos(vlist []youtube.Video) []youtube.Video {
 	return filtedVideoList
 }
 
+// 5分以内に公開される動画か
+func (y *Youtube) IsStartWithin5m(v youtube.Video) bool {
+	// プレミア公開、生放送終了した動画
+	if v.LiveStreamingDetails == nil || v.Snippet.LiveBroadcastContent == "none" {
+		return false
+	}
+
+	sst, _ := time.Parse("2006-01-02T15:04:05Z", v.LiveStreamingDetails.ScheduledStartTime)
+	sub := sst.Sub(time.Now().UTC()).Minutes()
+
+	return sub < 5 && sub >= 0
+}
+
 // 歌ってみた動画のタイトルによく含まれるキーワードが 指定した動画に含まれているか
 func (y *Youtube) FindSongKeyword(video youtube.Video) bool {
 	for _, word := range getSongWordList() {

@@ -15,6 +15,12 @@ type FCM struct {
 	Client *messaging.Client
 }
 
+type NotificationVideo struct {
+	ID        string
+	Title     string
+	Thumbnail string
+}
+
 func NewFCM() *FCM {
 	ctx := context.Background()
 	app, err := firebase.NewApp(context.Background(), nil)
@@ -29,11 +35,11 @@ func NewFCM() *FCM {
 	return &FCM{client}
 }
 
-func (c *FCM) SongNotification(video Video, tokens []string) error {
+func (c *FCM) Notification(title string, tokens []string, video *NotificationVideo) error {
 	message := &messaging.MulticastMessage{
 		Notification: &messaging.Notification{
-			Title: "5分後に公開",
-			Body: video.Title,
+			Title:    title,
+			Body:     video.Title,
 			ImageURL: video.Thumbnail,
 		},
 		Tokens: tokens,
@@ -49,7 +55,7 @@ func (c *FCM) SongNotification(video Video, tokens []string) error {
 
 	response, err := c.Client.SendEachForMulticast(context.Background(), message)
 	if err != nil {
-		slog.Error("SongNotification error",
+		slog.Error("Notification error",
 			slog.String("severity", "ERROR"),
 			slog.String("message", err.Error()),
 		)
@@ -57,7 +63,7 @@ func (c *FCM) SongNotification(video Video, tokens []string) error {
 	}
 	for _, r := range response.Responses {
 		if r.Error != nil {
-			slog.Error("SongNotification warning",
+			slog.Error("Notification warning",
 				slog.String("severity", "WARNING"),
 				slog.String("message", r.Error.Error()),
 			)
@@ -105,12 +111,12 @@ func (c *FCM) DeleteTopic(token string, topic string) error {
 	return nil
 }
 
-func (c *FCM) KeywordNotification(video Video, topic string) error {
+func (c *FCM) TopicNotification(topic string, video *NotificationVideo) error {
 	ctx := context.Background()
 	message := &messaging.Message{
 		Notification: &messaging.Notification{
-			Title: "キーワード通知",
-			Body: video.Title,
+			Title:    "キーワード通知",
+			Body:     video.Title,
 			ImageURL: video.Thumbnail,
 		},
 		Topic: strToByte(topic),
@@ -122,7 +128,7 @@ func (c *FCM) KeywordNotification(video Video, topic string) error {
 	}
 	_, err := c.Client.Send(ctx, message)
 	if err != nil {
-		slog.Error("KeywordNotification error",
+		slog.Error("TopicNotification error",
 			slog.String("severity", "ERROR"),
 			slog.String("message", err.Error()),
 		)
