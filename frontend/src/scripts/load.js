@@ -1,9 +1,10 @@
 import { initializeApp } from "firebase/app";
-import { firebaseConfig } from "./main";
-import { fcmToken } from "./main";
+import { fcmToken, firebaseConfig, vapidKey } from "./main";
+import { getMessaging, getToken } from "firebase/messaging";
 
 const songEle = document.getElementById("checkbox-song");
 const keywordEle = document.getElementById("checkbox-keyword");
+const keywordTextEle = document.getElementById("keyword-text");
 
 initializeApp(firebaseConfig);
 
@@ -17,10 +18,12 @@ window.onload = async () => {
   }
 
   // 既に購買済みか
-  const currentToken = window.localStorage.getItem("fcm-token");
-  if (currentToken == null) {
-    return;
+  if (Notification.permission !== "granted") {
+    return
   }
+
+  const messaging = getMessaging();
+  const currentToken = await getToken(messaging, { vapidKey });
 
   // APIサーバーから購買情報を取得　歌ってみた動画を通知する許可をしているか...
   const res = await fcmToken("GET", currentToken);
@@ -42,4 +45,6 @@ window.onload = async () => {
   window.localStorage.setItem("checkbox-song", data.song)
   keywordEle.checked = data.keyword;
   window.localStorage.setItem("checkbox-keyword", data.keyword);
+  keywordTextEle.value = data.keyword_text
+  window.localStorage.setItem("keyword", data.keyword_text)
 };
