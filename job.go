@@ -3,12 +3,12 @@ package nsa
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log/slog"
 	"regexp"
 	"slices"
 	"time"
 
+	"github.com/avast/retry-go"
 	"github.com/uptrace/bun"
 )
 
@@ -65,30 +65,100 @@ func (j *Job) CheckNewVideoJob() error {
 		return err
 	}
 
-	// フィルター
-	filtedVideos := j.yt.FilterVideos(videos)
-
-	// トランザクション開始
-	ctx := context.Background()
-	tx, err := j.db.Service.BeginTx(ctx, &sql.TxOptions{})
+	// 歌ってみた動画ゲリラ対応
+	notExistsVideos, err := j.db.NotExistsVideos(videos)
 	if err != nil {
 		return err
 	}
+	for _, v := range notExistsVideos {
+		// 5分以内に公開される動画ではない場合
+		if !j.yt.IsStartWithin5m(v) {
+			continue
+		}
+		// 歌ってみた動画に含まれているキーワードが含まれていない　除外キーワードが含まれている場合
+		if !j.yt.FindSongKeyword(v) || j.yt.FindIgnoreKeyword(v) {
+			continue
+		}
 
-	// DBのプレイリスト動画数を更新
-	err = j.db.UpdatePlaylistItem(tx, newPlaylists)
-	if err != nil {
-		return err
+		tokens, err := j.db.getSongTokens()
+		if err != nil {
+			return err
+		}
+		err = j.fcm.Notification(
+			"まもなく公開",
+			tokens,
+			&NotificationVideo{
+				ID:        v.Id,
+				Title:     v.Snippet.Title,
+				Thumbnail: v.Snippet.Thumbnails.High.Url,
+			},
+		)
+		if err != nil {
+			return err
+		}
 	}
 
-	// 動画情報をDBに登録
-	err = j.db.SaveVideos(tx, filtedVideos)
-	if err != nil {
-		return err
+	// 歌みた動画か判別しづらい動画をメールに送信する
+	for _, v := range videos {
+		if j.yt.FindSongKeyword(v) {
+			continue
+		}
+		if v.LiveStreamingDetails == nil {
+			continue
+		}
+		if v.Snippet.LiveBroadcastContent != "upcoming" {
+			continue
+		}
+		if v.ContentDetails.Duration == "P0D" {
+			continue
+		}
+		// 特定のキーワードを含んでいる場合
+		if j.yt.FindIgnoreKeyword(v) {
+			continue
+		}
+
+		err := NewMail().Subject("歌みた動画判定").Id(v.Id).Title(v.Snippet.Title).Send()
+		if err != nil {
+			return err
+		}
 	}
 
-	// コミット
-	err = tx.Commit()
+	// 3回までリトライ　1秒後にリトライ
+	err = retry.Do(
+		func() error {
+			// トランザクション開始
+			ctx := context.Background()
+			tx, err := j.db.Service.BeginTx(ctx, &sql.TxOptions{})
+			if err != nil {
+				return err
+			}
+
+			// DBのプレイリスト動画数を更新
+			err = j.db.UpdatePlaylistItem(tx, newPlaylists)
+			if err != nil {
+				tx.Rollback()
+				return err
+			}
+
+			// 動画情報をDBに登録
+			// 登録済みの動画は無視
+			err = j.db.SaveVideos(tx, videos)
+			if err != nil {
+				tx.Rollback()
+				return err
+			}
+
+			// コミット
+			err = tx.Commit()
+			if err != nil {
+				tx.Rollback()
+				return err
+			}
+			return nil
+		},
+		retry.Attempts(3),
+		retry.Delay(1*time.Second),
+	)
 	if err != nil {
 		return err
 	}
@@ -110,9 +180,6 @@ func (j *Job) SongVideoAnnounceJob() error {
 		return nil
 	}
 
-	// tw := NewTwitter()
-	// mk := NewMisskey(os.Getenv("MISSKEY_TOKEN"))
-
 	// FCMトークンを取得
 	tokens, err := j.db.getSongTokens()
 	if err != nil {
@@ -124,30 +191,23 @@ func (j *Job) SongVideoAnnounceJob() error {
 	}
 
 	for _, v := range videos {
-		err = SendMail("検証 5分後に公開", fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID))
+		err := NewMail().Subject("歌みた動画判定").Id(v.ID).Title(v.Title).Send()
 		if err != nil {
 			return err
 		}
 
 		// push通知
-		err := j.fcm.SongNotification(v, tokens)
+		err = j.fcm.Notification(
+			"5分後に公開",
+			tokens,
+			&NotificationVideo{
+				ID:        v.ID,
+				Title:     v.Title,
+				Thumbnail: v.Thumbnail,
+			})
 		if err != nil {
 			return err
 		}
-
-		// ツイート
-		// err = tw.Id(v.ID).Title(v.Title).Tweet()
-		// if err != nil {
-		// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-		// 	return
-		// }
-
-		// Missky post
-		// err = mk.Post(v.ID, v.Title)
-		// if err != nil {
-		// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-		// 	return
-		// }
 	}
 	return nil
 }
@@ -235,9 +295,13 @@ func (j *Job) KeywordAnnounceJob() error {
 		for _, v := range videos {
 			// キーワードに一致した場合
 			if regexp.MustCompile(reg).Match([]byte(v.Title)) {
-				err := j.fcm.KeywordNotification(v, keywordText)
+				err := j.fcm.TopicNotification(keywordText, &NotificationVideo{
+					ID:        v.ID,
+					Title:     v.Title,
+					Thumbnail: v.Thumbnail,
+				})
 				if err != nil {
-					slog.Error("KeywordNotification",
+					slog.Error("TopicNotification",
 						slog.String("severity", "ERROR"),
 						slog.String("message", err.Error()),
 					)
