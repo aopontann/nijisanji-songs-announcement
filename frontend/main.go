@@ -201,11 +201,10 @@ func getHandler(w http.ResponseWriter, token string, db *bun.DB, ctx context.Con
 	err := db.NewSelect().Column("song", "keyword", "keyword_text").Model(user).Where("token = ?", token).Scan(ctx)
 	if err == sql.ErrNoRows {
 		w.WriteHeader(http.StatusNoContent)
-		w.Write([]byte("No Content"))
 		return
 	}
 	if err != nil {
-		slog.Error("insert token error",
+		slog.Error("select token error",
 			slog.String("severity", "ERROR"),
 			slog.String("message", err.Error()),
 		)
@@ -216,7 +215,7 @@ func getHandler(w http.ResponseWriter, token string, db *bun.DB, ctx context.Con
 
 	v, err := json.Marshal(&ReqBody{user.Song, user.Keyword, user.KeywordText})
 	if err != nil {
-		slog.Error("insert token error",
+		slog.Error("json.Marshal error",
 			slog.String("severity", "ERROR"),
 			slog.String("message", err.Error()),
 		)
