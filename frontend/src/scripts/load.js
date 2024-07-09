@@ -27,6 +27,10 @@ window.onload = async () => {
 
   // APIサーバーから購買情報を取得　歌ってみた動画を通知する許可をしているか...
   const res = await fcmToken("GET", currentToken);
+  if (res.status == 204) {
+    console.log("no content");
+    return
+  }
   if (!res.ok) {
     window.alert("購買情報の取得に失敗しました。");
     return;
@@ -36,7 +40,6 @@ window.onload = async () => {
   console.log("data", data);
 
   if (data == null) {
-    window.localStorage.clear("fcm-token");
     return;
   }
 

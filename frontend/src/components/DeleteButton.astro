@@ -2,8 +2,8 @@
 
 <script>
   import { toast } from "bulma-toast";
-  import { getMessaging, deleteToken } from "firebase/messaging";
-  import { fcmToken } from "../scripts/main";
+  import { getMessaging, getToken, deleteToken } from "firebase/messaging";
+  import { fcmToken, vapidKey } from "../scripts/main";
 
   const messaging = getMessaging();
   const deleteEle = document.getElementById("delete") as HTMLElement;
@@ -14,6 +14,8 @@
     // ローディング表示
     deleteEle.classList.add("is-loading");
 
+    const currentToken = await getToken(messaging, { vapidKey });
+
     // FCMトークン削除
     const deleted = await deleteToken(messaging);
     if (!deleted) {
@@ -21,9 +23,6 @@
       // ローディング解除
       deleteEle.classList.remove("is-loading");
     }
-
-    const currentToken = window.localStorage.getItem("fcm-token");
-    window.localStorage.removeItem("fcm-token");
 
     const res = await fcmToken("DELETE", currentToken);
     if (!res.ok) {
