@@ -6,9 +6,11 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/messaging"
+	"github.com/avast/retry-go"
 )
 
 type FCM struct {
@@ -36,39 +38,62 @@ func NewFCM() *FCM {
 }
 
 func (c *FCM) Notification(title string, tokens []string, video *NotificationVideo) error {
-	message := &messaging.MulticastMessage{
-		Notification: &messaging.Notification{
-			Title:    title,
-			Body:     video.Title,
-			ImageURL: video.Thumbnail,
+	nofication := &messaging.Notification{
+		Title:    title,
+		Body:     video.Title,
+		ImageURL: video.Thumbnail,
+	}
+	webpush := &messaging.WebpushConfig{
+		Headers: map[string]string{
+			"Urgency": "high",
 		},
-		Tokens: tokens,
-		Webpush: &messaging.WebpushConfig{
-			Headers: map[string]string{
-				"Urgency": "high",
-			},
-			FCMOptions: &messaging.WebpushFCMOptions{
-				Link: "https://youtu.be/" + video.ID,
-			},
+		FCMOptions: &messaging.WebpushFCMOptions{
+			Link: "https://youtu.be/" + video.ID,
 		},
 	}
 
-	response, err := c.Client.SendEachForMulticast(context.Background(), message)
-	if err != nil {
-		slog.Error("Notification error",
-			slog.String("severity", "ERROR"),
-			slog.String("message", err.Error()),
-		)
-		return err
-	}
-	for _, r := range response.Responses {
-		if r.Error != nil {
-			slog.Error("Notification warning",
-				slog.String("severity", "WARNING"),
-				slog.String("message", r.Error.Error()),
-			)
+	for i := 0; i*500 <= len(tokens); i++ {
+		t := tokens[i*500 : (i+1)*500]
+		message := &messaging.MulticastMessage{
+			Notification: nofication,
+			Tokens:       t,
+			Webpush:      webpush,
 		}
+
+		// 3回までリトライ　1秒後にリトライ
+		err := retry.Do(
+			func() error {
+				response, err := c.Client.SendEachForMulticast(context.Background(), message)
+				if err != nil {
+					slog.Error("Notification error",
+						slog.String("severity", "ERROR"),
+						slog.String("message", err.Error()),
+					)
+					return err
+				}
+				for _, r := range response.Responses {
+					if r.Error != nil {
+						slog.Error("Notification warning",
+							slog.String("severity", "WARNING"),
+							slog.String("message", r.Error.Error()),
+						)
+					}
+				}
+				return nil
+			},
+			retry.Attempts(3),
+			retry.Delay(2*time.Second),
+		)
+		if err != nil {
+			slog.Error("Notification error (retry)",
+				slog.String("severity", "ERROR"),
+				slog.String("message", err.Error()),
+			)
+			return err
+		}
+
 	}
+
 	return nil
 }
 
