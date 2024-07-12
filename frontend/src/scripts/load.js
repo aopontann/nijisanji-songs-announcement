@@ -3,19 +3,12 @@ import { fcmToken, firebaseConfig, vapidKey } from "./main";
 import { getMessaging, getToken } from "firebase/messaging";
 
 const songEle = document.getElementById("checkbox-song");
-const keywordEle = document.getElementById("checkbox-keyword");
-const keywordTextEle = document.getElementById("keyword-text");
+const infoEle = document.getElementById("checkbox-info");
 
 initializeApp(firebaseConfig);
 
 window.onload = async () => {
   console.log("load");
-
-  // ブラウザーが通知に対応しているか調べる
-  if (!("Notification" in window)) {
-    window.alert("このブラウザーはデスクトップ通知には対応していません。");
-    return;
-  }
 
   // 既に購買済みか
   if (Notification.permission !== "granted") {
@@ -46,8 +39,6 @@ window.onload = async () => {
   // 最新の購買情報に応じて要素を変更
   songEle.checked = data.song;
   window.localStorage.setItem("checkbox-song", data.song)
-  keywordEle.checked = data.keyword;
-  window.localStorage.setItem("checkbox-keyword", data.keyword);
-  keywordTextEle.value = data.keyword_text
-  window.localStorage.setItem("keyword", data.keyword_text)
+  infoEle.checked = data.info;
+  window.localStorage.setItem("checkbox-info", data.info);
 };

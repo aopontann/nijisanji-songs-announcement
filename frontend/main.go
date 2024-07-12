@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -22,9 +21,8 @@ import (
 )
 
 type ReqBody struct {
-	Song        bool   `json:"song"`
-	Keyword     bool   `json:"keyword"`
-	KeywordText string `json:"keyword_text"`
+	Song bool `json:"song"`
+	Info bool `json:"info"`
 }
 
 //go:embed dist/*
@@ -42,8 +40,6 @@ func main() {
 	}
 	sqldb := stdlib.OpenDB(*config)
 	db := bun.NewDB(sqldb, pgdialect.New())
-
-	fcm := nsa.NewFCM()
 
 	dist, err := fs.Sub(dist, "dist")
 	if err != nil {
@@ -74,94 +70,24 @@ func main() {
 				return
 			}
 
-			// バリデーション処理
-			if utf8.RuneCountInString(b.KeywordText) > 20 {
-				http.Error(w, "21文字以上のキーワードは登録できません", http.StatusBadRequest)
-				return
-			}
+			slog.Info("POST", 
+				slog.String("severity", "INFO"),
+				slog.String("token", token),
+				slog.String("User-Agent", r.Header["User-Agent"][0]),
+			)
 
-			user := new(nsa.User)
-			err := db.NewSelect().Column("song", "keyword", "keyword_text").Model(user).Where("token = ?", token).Scan(ctx)
-			if err == sql.ErrNoRows {
-				_, err = db.NewInsert().
-					Model(&nsa.User{Token: token, Song: b.Song, Keyword: b.Keyword, KeywordText: b.KeywordText}).
-					Exec(ctx)
-				if err != nil {
-					slog.Error("NewInsert error",
-						slog.String("severity", "ERROR"),
-						slog.String("message", err.Error()),
-						slog.String("token", token),
-					)
-					http.Error(w, "登録に失敗しました。", http.StatusInternalServerError)
-					return
-				}
-				if user.Keyword && user.KeywordText != "" {
-					err = fcm.SetTopic(token, b.KeywordText)
-					if err != nil {
-						slog.Error("SetTopic error",
-							slog.String("severity", "ERROR"),
-							slog.String("message", err.Error()),
-							slog.String("token", token),
-							slog.String("topic", b.KeywordText),
-						)
-						http.Error(w, "キーワードの登録に失敗しました", http.StatusInternalServerError)
-						return
-					}
-				}
-				return
-			}
+			_, err := db.NewInsert().
+				Model(&nsa.User{Token: token, Song: b.Song, Info: b.Info}).
+				On("CONFLICT (token) DO UPDATE").
+				Set("song = EXCLUDED.song").
+				Set("info = EXCLUDED.info").
+				Exec(ctx)
 			if err != nil {
-				slog.Error("select user error",
+				slog.Error("Upsert error",
 					slog.String("severity", "ERROR"),
 					slog.String("message", err.Error()),
-					slog.String("token", token),
 				)
-				http.Error(w, "ユーザ情報の取得に失敗しました", http.StatusInternalServerError)
-				return
-			}
-
-			// 変更の場合
-			if !b.Keyword || user.KeywordText != "" {
-				err = fcm.DeleteTopic(token, user.KeywordText)
-				if err != nil {
-					slog.Error("DeleteTopic error",
-						slog.String("severity", "ERROR"),
-						slog.String("message", err.Error()),
-						slog.String("token", token),
-						slog.String("topic", user.KeywordText),
-					)
-					http.Error(w, "キーワードの更新に失敗しました", http.StatusInternalServerError)
-					return
-				}
-			}
-			if b.Keyword && b.KeywordText != "" {
-				err = fcm.SetTopic(token, b.KeywordText)
-				if err != nil {
-					slog.Error("Delete & SetTopic error",
-						slog.String("severity", "ERROR"),
-						slog.String("message", err.Error()),
-						slog.String("token", token),
-						slog.String("before_topic", user.KeywordText),
-						slog.String("after_topic", b.KeywordText),
-					)
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-			}
-
-			_, err = db.NewUpdate().
-				Model(&nsa.User{Token: token, Song: b.Song, Keyword: b.Keyword, KeywordText: b.KeywordText}).
-				Column("song", "keyword", "keyword_text").
-				WherePK().Exec(ctx)
-			if err != nil {
-				slog.Error("update user error",
-					slog.String("severity", "ERROR"),
-					slog.String("message", err.Error()),
-					slog.String("token", token),
-					slog.String("before_topic", user.KeywordText),
-					slog.String("after_topic", b.KeywordText),
-				)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(w, "処理に失敗しました", http.StatusInternalServerError)
 				return
 			}
 
@@ -198,7 +124,7 @@ func main() {
 
 func getHandler(w http.ResponseWriter, token string, db *bun.DB, ctx context.Context) {
 	user := new(nsa.User)
-	err := db.NewSelect().Column("song", "keyword", "keyword_text").Model(user).Where("token = ?", token).Scan(ctx)
+	err := db.NewSelect().Column("song", "info").Model(user).Where("token = ?", token).Scan(ctx)
 	if err == sql.ErrNoRows {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -213,7 +139,7 @@ func getHandler(w http.ResponseWriter, token string, db *bun.DB, ctx context.Con
 	}
 	w.Header().Set("content-Type", "application/json")
 
-	v, err := json.Marshal(&ReqBody{user.Song, user.Keyword, user.KeywordText})
+	v, err := json.Marshal(&ReqBody{user.Song, user.Info})
 	if err != nil {
 		slog.Error("json.Marshal error",
 			slog.String("severity", "ERROR"),

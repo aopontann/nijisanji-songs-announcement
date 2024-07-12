@@ -3,24 +3,19 @@
   歌みた動画が公開される5分前に通知を受け取る
 </label>
 <label class="checkbox mb-2">
-  <input id="checkbox-keyword" type="checkbox" />
-  指定したキーワードを含む動画がアップロードされた際に通知を受け取る(β版)
+  <input id="checkbox-info" type="checkbox" />
+  当アプリについてのお知らせを受け取る
 </label>
 
 <script>
-  import { isIos } from "../scripts/main";
   const songEle = document.getElementById("checkbox-song") as HTMLElement;
-  const keywordEle = document.getElementById("checkbox-keyword") as HTMLElement;
+  const infoEle = document.getElementById("checkbox-info") as HTMLElement;
 
   songEle.addEventListener("click", async () => {
     window.localStorage.setItem("checkbox-song", songEle.checked)
   });
 
-  keywordEle.addEventListener("click", async () => {
-    window.localStorage.setItem("checkbox-keyword", keywordEle.checked);
+  infoEle.addEventListener("click", async () => {
+    window.localStorage.setItem("checkbox-info", infoEle.checked)
   });
-
-  if (isIos()) {
-    keywordEle.disabled = true
-  }
 </script>
