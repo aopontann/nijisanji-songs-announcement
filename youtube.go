@@ -2,8 +2,10 @@ package nsa
 
 import (
 	"context"
-	"fmt"
+	"encoding/xml"
+	"io"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -15,6 +17,79 @@ type Youtube struct {
 	Service *youtube.Service
 }
 
+type Feed struct {
+	XMLName xml.Name `xml:"feed"`
+	Text    string   `xml:",chardata"`
+	Yt      string   `xml:"yt,attr"`
+	Media   string   `xml:"media,attr"`
+	Xmlns   string   `xml:"xmlns,attr"`
+	Link    []struct {
+		Text string `xml:",chardata"`
+		Rel  string `xml:"rel,attr"`
+		Href string `xml:"href,attr"`
+	} `xml:"link"`
+	ID        string `xml:"id"`
+	ChannelId string `xml:"channelId"`
+	Title     string `xml:"title"`
+	Author    struct {
+		Text string `xml:",chardata"`
+		Name string `xml:"name"`
+		URI  string `xml:"uri"`
+	} `xml:"author"`
+	Published string `xml:"published"`
+	Entry     []struct {
+		Text      string `xml:",chardata"`
+		ID        string `xml:"id"`
+		VideoId   string `xml:"videoId"`
+		ChannelId string `xml:"channelId"`
+		Title     string `xml:"title"`
+		Link      struct {
+			Text string `xml:",chardata"`
+			Rel  string `xml:"rel,attr"`
+			Href string `xml:"href,attr"`
+		} `xml:"link"`
+		Author struct {
+			Text string `xml:",chardata"`
+			Name string `xml:"name"`
+			URI  string `xml:"uri"`
+		} `xml:"author"`
+		Published string `xml:"published"`
+		Updated   string `xml:"updated"`
+		Group     struct {
+			Text    string `xml:",chardata"`
+			Title   string `xml:"title"`
+			Content struct {
+				Text   string `xml:",chardata"`
+				URL    string `xml:"url,attr"`
+				Type   string `xml:"type,attr"`
+				Width  string `xml:"width,attr"`
+				Height string `xml:"height,attr"`
+			} `xml:"content"`
+			Thumbnail struct {
+				Text   string `xml:",chardata"`
+				URL    string `xml:"url,attr"`
+				Width  string `xml:"width,attr"`
+				Height string `xml:"height,attr"`
+			} `xml:"thumbnail"`
+			Description string `xml:"description"`
+			Community   struct {
+				Text       string `xml:",chardata"`
+				StarRating struct {
+					Text    string `xml:",chardata"`
+					Count   string `xml:"count,attr"`
+					Average string `xml:"average,attr"`
+					Min     string `xml:"min,attr"`
+					Max     string `xml:"max,attr"`
+				} `xml:"starRating"`
+				Statistics struct {
+					Text  string `xml:",chardata"`
+					Views string `xml:"views,attr"`
+				} `xml:"statistics"`
+			} `xml:"community"`
+		} `xml:"group"`
+	} `xml:"entry"`
+}
+
 func NewYoutube(key string) *Youtube {
 	ctx := context.Background()
 	yt, err := youtube.NewService(ctx, option.WithAPIKey(key))
@@ -24,19 +99,34 @@ func NewYoutube(key string) *Youtube {
 	return &Youtube{yt}
 }
 
-// チャンネルIDをキー、プレイリストに含まれている動画数を値とした連想配列を返す
-func (y *Youtube) Playlists(plist []string) (map[string]int64, error) {
-	newlist := make(map[string]int64, 500)
-	for i := 0; i*50 <= len(plist); i++ {
-		var id string
-		if len(plist) > 50*(i+1) {
-			id = strings.Join(plist[50*i:50*(i+1)], ",")
-		} else {
-			id = strings.Join(plist[50*i:], ",")
-		}
-		call := y.Service.Playlists.List([]string{"snippet", "contentDetails"}).MaxResults(50).Id(id)
-		res, err := call.Do()
+// RSSから過去5分間にアップロードされた動画IDを取得
+func (y *Youtube) RssFeed(clist []string) ([]string, error) {
+	var vids []string
+	for _, cid := range clist {
+		resp, err := http.Get("https://www.youtube.com/feeds/videos.xml?channel_id=" + cid)
 		if err != nil {
+			resp.Body.Close()
+			return nil, err
+		}
+		if resp.StatusCode != http.StatusOK {
+			slog.Warn("youtube-playlists-list",
+				slog.String("severity", "WARNING"),
+				slog.String("channel_id", cid),
+				slog.Int("status_code", resp.StatusCode),
+			)
+			resp.Body.Close()
+			continue
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			resp.Body.Close()
+			return nil, err
+		}
+		resp.Body.Close()
+
+		var feed Feed
+		if err := xml.Unmarshal([]byte(body), &feed); err != nil {
 			slog.Error("playlists-list",
 				slog.String("severity", "ERROR"),
 				slog.String("message", err.Error()),
@@ -44,48 +134,21 @@ func (y *Youtube) Playlists(plist []string) (map[string]int64, error) {
 			return nil, err
 		}
 
-		for _, item := range res.Items {
-			newlist[item.Id] = item.ContentDetails.ItemCount
-			slog.Debug("youtube-playlists-list",
-				slog.String("severity", "DEBUG"),
-				slog.String("PlaylistId", item.Id),
-				slog.Int64("ItemCount", item.ContentDetails.ItemCount),
-			)
+		for _, entry := range feed.Entry {
+			sst, _ := time.Parse("2006-01-02T15:04:05+00:00", entry.Published)
+			if time.Now().UTC().Sub(sst).Minutes() <= 5 {
+				slog.Debug("RssFeed",
+					slog.String("severity", "DEBUG"),
+					slog.String("id", entry.VideoId),
+					slog.String("title", entry.Title),
+					slog.String("published", entry.Published),
+					slog.String("updated", entry.Updated),
+				)
+				vids = append(vids, entry.VideoId)
+			}
 		}
 	}
-	return newlist, nil
-}
-
-func (y *Youtube) PlaylistItems(plist []string) ([]string, error) {
-	// 動画IDを格納する文字列型配列を宣言
-	vidList := make([]string, 0, 1500)
-
-	for _, pid := range plist {
-		// 取得した動画IDをログに出力するための変数
-		fmt.Println(pid)
-		var rid []string
-		call := y.Service.PlaylistItems.List([]string{"snippet"}).PlaylistId(pid).MaxResults(3)
-		res, err := call.Do()
-		if err != nil {
-			slog.Error("playlistitems-list",
-				slog.String("severity", "ERROR"),
-				slog.String("message", err.Error()),
-			)
-			return []string{}, err
-		}
-
-		for _, item := range res.Items {
-			rid = append(rid, item.Snippet.ResourceId.VideoId)
-			vidList = append(vidList, item.Snippet.ResourceId.VideoId)
-		}
-
-		slog.Debug("youtube-playlistitems-list",
-			slog.String("severity", "DEBUG"),
-			slog.String("PlaylistId", pid),
-			slog.String("videoId", strings.Join(rid, ",")),
-		)
-	}
-	return vidList, nil
+	return vids, nil
 }
 
 // Youtube Data API から動画情報を取得

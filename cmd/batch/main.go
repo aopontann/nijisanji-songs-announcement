@@ -45,41 +45,11 @@ func main() {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})
-	http.HandleFunc("/v2/keyword", func(w http.ResponseWriter, r *http.Request) {
-		err := job.KeywordAnnounceJob()
-		if err != nil {
-			slog.Error("KeywordAnnounceJob",
-				slog.String("severity", "ERROR"),
-				slog.String("message", err.Error()),
-			)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	})
+
 	http.HandleFunc("/v2/song", func(w http.ResponseWriter, r *http.Request) {
 		err := job.SongVideoAnnounceJob()
 		if err != nil {
 			slog.Error("SongVideoAnnounceJob",
-				slog.String("severity", "ERROR"),
-				slog.String("message", err.Error()),
-			)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	})
-	http.HandleFunc("/v2/delete", func(w http.ResponseWriter, r *http.Request) {
-		err := job.DeleteVideoJob()
-		if err != nil {
-			slog.Error("DeleteVideoJob",
-				slog.String("severity", "ERROR"),
-				slog.String("message", err.Error()),
-			)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	})
-
-	http.HandleFunc("/v2/playlistItems/update", func(w http.ResponseWriter, r *http.Request) {
-		err := job.UpdatePlaylistItemJob()
-		if err != nil {
-			slog.Error("UpdatePlaylistItemJob",
 				slog.String("severity", "ERROR"),
 				slog.String("message", err.Error()),
 			)

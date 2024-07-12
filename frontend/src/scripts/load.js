@@ -1,29 +1,29 @@
 import { initializeApp } from "firebase/app";
-import { firebaseConfig } from "./main";
-import { fcmToken } from "./main";
+import { fcmToken, firebaseConfig, vapidKey } from "./main";
+import { getMessaging, getToken } from "firebase/messaging";
 
 const songEle = document.getElementById("checkbox-song");
-const keywordEle = document.getElementById("checkbox-keyword");
+const infoEle = document.getElementById("checkbox-info");
 
 initializeApp(firebaseConfig);
 
 window.onload = async () => {
   console.log("load");
 
-  // ブラウザーが通知に対応しているか調べる
-  if (!("Notification" in window)) {
-    window.alert("このブラウザーはデスクトップ通知には対応していません。");
-    return;
+  // 既に購買済みか
+  if (Notification.permission !== "granted") {
+    return
   }
 
-  // 既に購買済みか
-  const currentToken = window.localStorage.getItem("fcm-token");
-  if (currentToken == null) {
-    return;
-  }
+  const messaging = getMessaging();
+  const currentToken = await getToken(messaging, { vapidKey });
 
   // APIサーバーから購買情報を取得　歌ってみた動画を通知する許可をしているか...
   const res = await fcmToken("GET", currentToken);
+  if (res.status == 204) {
+    console.log("no content");
+    return
+  }
   if (!res.ok) {
     window.alert("購買情報の取得に失敗しました。");
     return;
@@ -33,13 +33,12 @@ window.onload = async () => {
   console.log("data", data);
 
   if (data == null) {
-    window.localStorage.clear("fcm-token");
     return;
   }
 
   // 最新の購買情報に応じて要素を変更
   songEle.checked = data.song;
   window.localStorage.setItem("checkbox-song", data.song)
-  keywordEle.checked = data.keyword;
-  window.localStorage.setItem("checkbox-keyword", data.keyword);
+  infoEle.checked = data.info;
+  window.localStorage.setItem("checkbox-info", data.info);
 };

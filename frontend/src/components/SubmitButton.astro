@@ -23,8 +23,7 @@
 
     const ok = await saveFCMToken(currentToken, {
       song: window.localStorage.getItem("checkbox-song") == "true",
-      keyword: window.localStorage.getItem("checkbox-keyword") == "true",
-      keyword_text: window.localStorage.getItem("keyword")
+      info: window.localStorage.getItem("checkbox-info") == "true",
     });
     if (!ok) {
       window.alert("トークンの登録に失敗しました");
@@ -32,8 +31,6 @@
       submitEle.classList.remove("is-loading");
       return;
     }
-
-    window.localStorage.setItem("fcm-token", currentToken);
 
     // ローディング解除
     submitEle.classList.remove("is-loading");
@@ -63,9 +60,8 @@
         window.alert("通知を許可してください。");
       }
 
-      // 通知権限がブロックされていないが、ユーザーの許可を得れていない場合
       if (Notification.permission === "granted") {
-        window.alert("エラーが発生しました。再度通知登録をしてください。");
+        return await getToken(messaging, { vapidKey });
       }
     }
     return "";

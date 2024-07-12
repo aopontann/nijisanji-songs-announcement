@@ -39,12 +39,11 @@ type Video struct {
 type User struct {
 	bun.BaseModel `bun:"table:users"`
 
-	Token       string    `json:"token" bun:"token,type:varchar(1000),pk"`
-	Song        bool      `json:"song" bun:"song,default:false,type:boolean"`
-	Keyword     bool      `json:"keyword" bun:"keyword,default:false,type:boolean"`
-	KeywordText string    `json:"keyword_text" bun:"keyword_text,type:varchar(100)"`
-	CreatedAt   time.Time `bun:"created_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
-	UpdatedAt   time.Time `bun:"updated_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
+	Token     string    `json:"token" bun:"token,type:varchar(1000),pk"`
+	Song      bool      `json:"song" bun:"song,default:false,notnull,type:boolean"`
+	Info      bool      `json:"info" bun:"info,default:false,notnull,type:boolean"`
+	CreatedAt time.Time `bun:"created_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
+	UpdatedAt time.Time `bun:"updated_at,type:TIMESTAMP(0),nullzero,notnull,default:CURRENT_TIMESTAMP"`
 }
 
 type DB struct {
@@ -59,53 +58,20 @@ func NewDB(db *bun.DB) *DB {
 	return &DB{db}
 }
 
-// DBに登録されているPlaylistsの動画数を取得
-// 返り値：map （キー：プレイリストID　値：動画数）
-func (db *DB) Playlists() (map[string]int64, error) {
+func (db *DB) ChannelIDs() ([]string, error) {
 	// DBからチャンネルID、チャンネルごとの動画数を取得
 	var ids []string
-	var itemCount []int64
 	ctx := context.Background()
-	err := db.Service.NewSelect().Model((*Vtuber)(nil)).Column("id", "item_count").Scan(ctx, &ids, &itemCount)
+	err := db.Service.NewSelect().Model((*Vtuber)(nil)).Column("id").Scan(ctx, &ids)
 	if err != nil {
 		return nil, err
 	}
 
-	list := make(map[string]int64, 500)
-	for i := range ids {
-		pid := strings.Replace(ids[i], "UC", "UU", 1)
-		list[pid] = itemCount[i]
-	}
-
-	return list, nil
+	return ids, nil
 }
 
-func (db *DB) UpdatePlaylistItem(tx bun.Tx, newlist map[string]int64) error {
-	ctx := context.Background()
-	// DBを新しく取得したデータに更新
-	var updateVideo []Vtuber
-	for pid, v := range newlist {
-		cid := strings.Replace(pid, "UU", "UC", 1)
-		updateVideo = append(updateVideo, Vtuber{ID: cid, ItemCount: v, UpdatedAt: time.Now()})
-	}
-
-	if len(updateVideo) == 0 {
-		return nil
-	}
-
-	_, err := tx.NewUpdate().Model(&updateVideo).Column("item_count", "updated_at").Bulk().Exec(ctx)
-	if err != nil {
-		slog.Error("update-itemCount",
-			slog.String("severity", "ERROR"),
-			slog.String("message", err.Error()),
-		)
-		return err
-	}
-
-	return nil
-}
-
-func (db *DB) SaveVideos(tx bun.Tx, vlist []youtube.Video) error {
+// 動画情報をDBに登録　登録済みの動画は無視する
+func (db *DB) SaveVideos(vlist []youtube.Video) error {
 	var Videos []Video
 	for _, v := range vlist {
 		var Viewers int64
@@ -135,7 +101,7 @@ func (db *DB) SaveVideos(tx bun.Tx, vlist []youtube.Video) error {
 	}
 
 	ctx := context.Background()
-	_, err := tx.NewInsert().Model(&Videos).Ignore().Exec(ctx)
+	_, err := db.Service.NewInsert().Model(&Videos).Ignore().Exec(ctx)
 	if err != nil {
 		return err
 	}
@@ -143,6 +109,7 @@ func (db *DB) SaveVideos(tx bun.Tx, vlist []youtube.Video) error {
 	return nil
 }
 
+// DBに登録されていない動画リストのみフィルター
 func (db *DB) NotExistsVideos(videos []youtube.Video) ([]youtube.Video, error) {
 	ctx := context.Background()
 	// IN句に使用する動画IDリスト
@@ -152,7 +119,7 @@ func (db *DB) NotExistsVideos(videos []youtube.Video) ([]youtube.Video, error) {
 	}
 
 	// 既に存在している動画IDリスト
-	var ids []string 
+	var ids []string
 	err := db.Service.NewSelect().Model((*Video)(nil)).Column("id").Where("id IN (?)", bun.In(sids)).Scan(ctx, &ids)
 	if err != nil {
 		slog.Error("NotExistsVideos",
@@ -220,6 +187,7 @@ func (db *DB) songVideos5m() ([]Video, error) {
 	return filtedVideos, nil
 }
 
+// songカラムがtrueのトークンリストを取得
 func (db *DB) getSongTokens() ([]string, error) {
 	// DBからチャンネルID、チャンネルごとの動画数を取得
 	var tokens []string
@@ -231,61 +199,3 @@ func (db *DB) getSongTokens() ([]string, error) {
 
 	return tokens, nil
 }
-
-func (db *DB) getKeywordTextList() ([]string, error) {
-	// DBからチャンネルID、チャンネルごとの動画数を取得
-	var list []string
-	ctx := context.Background()
-	err := db.Service.NewSelect().Model((*User)(nil)).Column("keyword_text").Where("keyword = true").Where("keyword_text != ''").Group("keyword_text").Scan(ctx, &list)
-	if err != nil {
-		return nil, err
-	}
-
-	return list, nil
-}
-
-// func (db *DB) GetKeywordRegisterList() ([]Result, error) {
-
-// 	url := os.Getenv("D1_URL")
-// 	method := "POST"
-// 	token := os.Getenv("D1_TOKEN")
-
-// 	payload := strings.NewReader(`
-//   {
-//     "sql": "SELECT * FROM users WHERE not word = '';"
-//   }`)
-
-// 	client := &http.Client{}
-// 	req, err := http.NewRequest(method, url, payload)
-
-// 	if err != nil {
-// 		fmt.Println(err)
-// 		return nil, err
-// 	}
-// 	req.Header.Add("Content-Type", "application/json")
-// 	req.Header.Add("Authorization", "Bearer "+token)
-
-// 	res, err := client.Do(req)
-// 	if err != nil {
-// 		fmt.Println(err)
-// 		return nil, err
-// 	}
-// 	defer res.Body.Close()
-
-// 	s := &D1Response{}
-// 	body, err := io.ReadAll(res.Body)
-// 	if err != nil {
-// 		fmt.Println(err)
-// 		return nil, err
-// 	}
-// 	json.Unmarshal(body, s)
-
-// 	slog.Info(
-// 		"get-keyword-d1",
-// 		slog.String("severity", "INFO"),
-// 		slog.Any("res", s),
-// 		slog.String("status_code", res.Status),
-// 	)
-
-// 	return s.Result[0].Results, nil
-// }

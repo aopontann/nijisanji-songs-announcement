@@ -2,9 +2,7 @@ package nsa
 
 import (
 	"context"
-	"database/sql"
 	"log/slog"
-	"regexp"
 	"slices"
 	"time"
 
@@ -27,40 +25,20 @@ func NewJobs(youtubeApiKey string, db *bun.DB) *Job {
 }
 
 func (j *Job) CheckNewVideoJob() error {
-	// DBに登録されているプレイリストの動画数を取得
-	oldPlaylists, err := j.db.Playlists()
+	// チャンネルIDリストを取得
+	cids, err := j.db.ChannelIDs()
 	if err != nil {
 		return err
 	}
 
-	// プレイリストIDリスト
-	var plist []string
-	for pid := range oldPlaylists {
-		plist = append(plist, pid)
-	}
-
-	// Youtube Data API から最新のプレイリストの動画数を取得
-	newPlaylists, err := j.yt.Playlists(plist)
-	if err != nil {
-		return err
-	}
-
-	// 動画数が変化しているプレイリストIDを取得
-	var changedPlaylistID []string
-	for pid, itemCount := range oldPlaylists {
-		if itemCount != newPlaylists[pid] {
-			changedPlaylistID = append(changedPlaylistID, pid)
-		}
-	}
-
-	// 新しくアップロードされた動画IDを取得
-	vidList, err := j.yt.PlaylistItems(changedPlaylistID)
+	// 過去5分間に投稿された動画を取得
+	vids, err := j.yt.RssFeed(cids)
 	if err != nil {
 		return err
 	}
 
 	// 動画情報を取得
-	videos, err := j.yt.Videos(vidList)
+	videos, err := j.yt.Videos(vids)
 	if err != nil {
 		return err
 	}
@@ -126,32 +104,10 @@ func (j *Job) CheckNewVideoJob() error {
 	// 3回までリトライ　1秒後にリトライ
 	err = retry.Do(
 		func() error {
-			// トランザクション開始
-			ctx := context.Background()
-			tx, err := j.db.Service.BeginTx(ctx, &sql.TxOptions{})
-			if err != nil {
-				return err
-			}
-
-			// DBのプレイリスト動画数を更新
-			err = j.db.UpdatePlaylistItem(tx, newPlaylists)
-			if err != nil {
-				tx.Rollback()
-				return err
-			}
-
 			// 動画情報をDBに登録
 			// 登録済みの動画は無視
-			err = j.db.SaveVideos(tx, videos)
+			err = j.db.SaveVideos(videos)
 			if err != nil {
-				tx.Rollback()
-				return err
-			}
-
-			// コミット
-			err = tx.Commit()
-			if err != nil {
-				tx.Rollback()
 				return err
 			}
 			return nil
@@ -267,90 +223,49 @@ func (j *Job) DeleteVideoJob() error {
 }
 
 // キーワード告知
-func (j *Job) KeywordAnnounceJob() error {
-	ctx := context.Background()
-	now, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
-	tAfter := now.Add(-20 * time.Minute)
-	tBefore := now.Add(-10 * time.Minute)
-	var videos []Video
-	err := j.db.Service.NewSelect().Model(&videos).Where("? BETWEEN ? AND ?", bun.Ident("created_at"), tAfter, tBefore).Scan(ctx)
-	if err != nil {
-		return err
-	}
-	if len(videos) == 0 {
-		return nil
-	}
+// func (j *Job) KeywordAnnounceJob() error {
+// 	ctx := context.Background()
+// 	now, _ := time.Parse(time.RFC3339, time.Now().UTC().Format("2006-01-02T15:04:00Z"))
+// 	tAfter := now.Add(-20 * time.Minute)
+// 	tBefore := now.Add(-10 * time.Minute)
+// 	var videos []Video
+// 	err := j.db.Service.NewSelect().Model(&videos).Where("? BETWEEN ? AND ?", bun.Ident("created_at"), tAfter, tBefore).Scan(ctx)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	if len(videos) == 0 {
+// 		return nil
+// 	}
 
-	// FCMトークンを取得
-	keywordTextList, err := j.db.getKeywordTextList()
-	if err != nil {
-		slog.Error("getKeywordTextList",
-			slog.String("severity", "ERROR"),
-			slog.String("message", err.Error()),
-		)
-		return err
-	}
-	for _, keywordText := range keywordTextList {
-		reg := ".*" + keywordText + ".*"
-		for _, v := range videos {
-			// キーワードに一致した場合
-			if regexp.MustCompile(reg).Match([]byte(v.Title)) {
-				err := j.fcm.TopicNotification(keywordText, &NotificationVideo{
-					ID:        v.ID,
-					Title:     v.Title,
-					Thumbnail: v.Thumbnail,
-				})
-				if err != nil {
-					slog.Error("TopicNotification",
-						slog.String("severity", "ERROR"),
-						slog.String("message", err.Error()),
-					)
-				}
-				return err
-			}
-		}
-	}
+// 	// FCMトークンを取得
+// 	keywordTextList, err := j.db.getKeywordTextList()
+// 	if err != nil {
+// 		slog.Error("getKeywordTextList",
+// 			slog.String("severity", "ERROR"),
+// 			slog.String("message", err.Error()),
+// 		)
+// 		return err
+// 	}
+// 	for _, keywordText := range keywordTextList {
+// 		reg := ".*" + keywordText + ".*"
+// 		for _, v := range videos {
+// 			// キーワードに一致した場合
+// 			if regexp.MustCompile(reg).Match([]byte(v.Title)) {
+// 				err := j.fcm.TopicNotification(keywordText, &NotificationVideo{
+// 					ID:        v.ID,
+// 					Title:     v.Title,
+// 					Thumbnail: v.Thumbnail,
+// 				})
+// 				if err != nil {
+// 					slog.Error("TopicNotification",
+// 						slog.String("severity", "ERROR"),
+// 						slog.String("message", err.Error()),
+// 					)
+// 				}
+// 				return err
+// 			}
+// 		}
+// 	}
 
-	return nil
-}
-
-func (j *Job) UpdatePlaylistItemJob() error {
-	// DBに登録されているプレイリストの動画数を取得
-	oldPlaylists, err := j.db.Playlists()
-	if err != nil {
-		return err
-	}
-
-	// プレイリストIDリスト
-	var plist []string
-	for pid := range oldPlaylists {
-		plist = append(plist, pid)
-	}
-
-	// Youtube Data API から最新のプレイリストの動画数を取得
-	newPlaylists, err := j.yt.Playlists(plist)
-	if err != nil {
-		return err
-	}
-
-	// トランザクション開始
-	ctx := context.Background()
-	tx, err := j.db.Service.BeginTx(ctx, &sql.TxOptions{})
-	if err != nil {
-		return err
-	}
-
-	// DBのプレイリスト動画数を更新
-	err = j.db.UpdatePlaylistItem(tx, newPlaylists)
-	if err != nil {
-		return err
-	}
-
-	// コミット
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
+// 	return nil
+// }
