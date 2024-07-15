@@ -99,7 +99,69 @@ func NewYoutube(key string) *Youtube {
 	return &Youtube{yt}
 }
 
-// RSSから過去5分間にアップロードされた動画IDを取得
+// チャンネルIDをキー、プレイリストに含まれている動画数を値とした連想配列を返す
+func (y *Youtube) Playlists(plist []string) (map[string]int64, error) {
+	newlist := make(map[string]int64, 500)
+	for i := 0; i*50 <= len(plist); i++ {
+		var id string
+		if len(plist) > 50*(i+1) {
+			id = strings.Join(plist[50*i:50*(i+1)], ",")
+		} else {
+			id = strings.Join(plist[50*i:], ",")
+		}
+		call := y.Service.Playlists.List([]string{"snippet", "contentDetails"}).MaxResults(50).Id(id)
+		res, err := call.Do()
+		if err != nil {
+			slog.Error("playlists-list",
+				slog.String("severity", "ERROR"),
+				slog.String("message", err.Error()),
+			)
+			return nil, err
+		}
+
+		for _, item := range res.Items {
+			newlist[item.Id] = item.ContentDetails.ItemCount
+			slog.Debug("youtube-playlists-list",
+				slog.String("severity", "DEBUG"),
+				slog.String("PlaylistId", item.Id),
+				slog.Int64("ItemCount", item.ContentDetails.ItemCount),
+			)
+		}
+	}
+	return newlist, nil
+}
+
+func (y *Youtube) PlaylistItems(plist []string) ([]string, error) {
+	// 動画IDを格納する文字列型配列を宣言
+	vidList := make([]string, 0, 1500)
+
+	for _, pid := range plist {
+		var rid []string
+		call := y.Service.PlaylistItems.List([]string{"snippet"}).PlaylistId(pid).MaxResults(3)
+		res, err := call.Do()
+		if err != nil {
+			slog.Error("playlistitems-list",
+				slog.String("severity", "ERROR"),
+				slog.String("message", err.Error()),
+			)
+			return []string{}, err
+		}
+
+		for _, item := range res.Items {
+			rid = append(rid, item.Snippet.ResourceId.VideoId)
+			vidList = append(vidList, item.Snippet.ResourceId.VideoId)
+		}
+
+		slog.Debug("youtube-playlistitems-list",
+			slog.String("severity", "DEBUG"),
+			slog.String("PlaylistId", pid),
+			slog.String("videoId", strings.Join(rid, ",")),
+		)
+	}
+	return vidList, nil
+}
+
+// RSSから過去15分間にアップロードされた動画IDを取得
 func (y *Youtube) RssFeed(clist []string) ([]string, error) {
 	var vids []string
 	for _, cid := range clist {
@@ -136,7 +198,7 @@ func (y *Youtube) RssFeed(clist []string) ([]string, error) {
 
 		for _, entry := range feed.Entry {
 			sst, _ := time.Parse("2006-01-02T15:04:05+00:00", entry.Published)
-			if time.Now().UTC().Sub(sst).Minutes() <= 5 {
+			if time.Now().UTC().Sub(sst).Minutes() <= 15 {
 				slog.Debug("RssFeed",
 					slog.String("severity", "DEBUG"),
 					slog.String("id", entry.VideoId),
