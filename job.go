@@ -58,8 +58,22 @@ func (j *Job) CheckNewVideoJob() error {
 		return err
 	}
 
+	// RSSから動画IDリストを取得
+	cids, err := j.db.ChannelIDs()
+	if err != nil {
+		return err
+	}
+	rssVidList, err := j.yt.RssFeed(cids)
+	if err != nil {
+		return err
+	}
+
+	// 重複している動画IDを削除する準備
+	targetVids := append(vidList, rssVidList...)
+	slices.Sort(targetVids)
+
 	// 動画情報を取得
-	videos, err := j.yt.Videos(vidList)
+	videos, err := j.yt.Videos(slices.Compact(targetVids))
 	if err != nil {
 		return err
 	}
