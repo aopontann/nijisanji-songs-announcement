@@ -84,16 +84,25 @@ func (j *Job) CheckNewVideoJob() error {
 		return err
 	}
 	for _, v := range notExistsVideos {
-		// プレミア公開、生放送終了した動画
-		if v.LiveStreamingDetails != nil && v.Snippet.LiveBroadcastContent == "none" {
+		// 生放送ではない、プレミア公開されない動画の場合
+		if v.LiveStreamingDetails == nil {
 			continue
 		}
-		if !j.yt.FindSongKeyword(v) && j.yt.FindIgnoreKeyword(v) {
+		// 放送終了した場合
+		if v.Snippet.LiveBroadcastContent == "none" {
+			continue
+		}
+		// 生放送の場合
+		if v.ContentDetails.Duration == "P0D" {
+			continue
+		}
+		if !j.yt.FindSongKeyword(v) || j.yt.FindIgnoreKeyword(v) {
 			continue
 		}
 		// 5分以内に公開される動画
 		sst, _ := time.Parse("2006-01-02T15:04:05Z", v.LiveStreamingDetails.ScheduledStartTime)
-		if time.Now().UTC().Sub(sst).Minutes() < 5 {
+		sub := time.Now().UTC().Sub(sst).Minutes()
+		if sub < 5 && sub >= 0 {
 			tokens, err := j.db.getSongTokens()
 			if err != nil {
 				return err
