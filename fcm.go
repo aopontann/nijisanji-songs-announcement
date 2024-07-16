@@ -53,7 +53,12 @@ func (c *FCM) Notification(title string, tokens []string, video *NotificationVid
 	}
 
 	for i := 0; i*500 <= len(tokens); i++ {
-		t := tokens[i*500 : (i+1)*500]
+		var t []string
+		if len(tokens) > 500*(i+1) {
+			t = tokens[i*500:(i+1)*500]
+		} else {
+			t = tokens[500*i:]
+		}
 		message := &messaging.MulticastMessage{
 			Notification: nofication,
 			Tokens:       t,
