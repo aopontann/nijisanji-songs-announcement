@@ -58,6 +58,52 @@ func NewDB(db *bun.DB) *DB {
 	return &DB{db}
 }
 
+// DBに登録されているPlaylistsの動画数を取得
+// 返り値：map （キー：プレイリストID　値：動画数）
+func (db *DB) Playlists() (map[string]int64, error) {
+	// DBからチャンネルID、チャンネルごとの動画数を取得
+	var ids []string
+	var itemCount []int64
+	ctx := context.Background()
+	err := db.Service.NewSelect().Model((*Vtuber)(nil)).Column("id", "item_count").Scan(ctx, &ids, &itemCount)
+	if err != nil {
+		return nil, err
+	}
+
+	list := make(map[string]int64, 500)
+	for i := range ids {
+		pid := strings.Replace(ids[i], "UC", "UU", 1)
+		list[pid] = itemCount[i]
+	}
+
+	return list, nil
+}
+
+func (db *DB) UpdatePlaylistItem(tx bun.Tx, newlist map[string]int64) error {
+	ctx := context.Background()
+	// DBを新しく取得したデータに更新
+	var updateVideo []Vtuber
+	for pid, v := range newlist {
+		cid := strings.Replace(pid, "UU", "UC", 1)
+		updateVideo = append(updateVideo, Vtuber{ID: cid, ItemCount: v, UpdatedAt: time.Now()})
+	}
+
+	if len(updateVideo) == 0 {
+		return nil
+	}
+
+	_, err := tx.NewUpdate().Model(&updateVideo).Column("item_count", "updated_at").Bulk().Exec(ctx)
+	if err != nil {
+		slog.Error("update-itemCount",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
+		return err
+	}
+
+	return nil
+}
+
 func (db *DB) ChannelIDs() ([]string, error) {
 	// DBからチャンネルID、チャンネルごとの動画数を取得
 	var ids []string
@@ -71,7 +117,7 @@ func (db *DB) ChannelIDs() ([]string, error) {
 }
 
 // 動画情報をDBに登録　登録済みの動画は無視する
-func (db *DB) SaveVideos(vlist []youtube.Video) error {
+func (db *DB) SaveVideos(tx bun.Tx, vlist []youtube.Video) error {
 	var Videos []Video
 	for _, v := range vlist {
 		var Viewers int64
@@ -101,7 +147,7 @@ func (db *DB) SaveVideos(vlist []youtube.Video) error {
 	}
 
 	ctx := context.Background()
-	_, err := db.Service.NewInsert().Model(&Videos).Ignore().Exec(ctx)
+	_, err := tx.NewInsert().Model(&Videos).Ignore().Exec(ctx)
 	if err != nil {
 		return err
 	}

@@ -163,3 +163,26 @@ func TestIsStartWithin5m(t *testing.T) {
 		t.Error("failed")
 	}
 }
+
+func TestFindSongKeyword(t *testing.T) {
+	youtubeApiKey := os.Getenv("YOUTUBE_API_KEY")
+	yt := NewYoutube(youtubeApiKey)
+
+	var res youtube.VideoListResponse
+	data, err := os.ReadFile("testdata/videos.json")
+	if err != nil {
+		t.Error(err)
+	}
+	if err := json.Unmarshal([]byte(data), &res); err != nil {
+		t.Error(err)
+	}
+
+	for _, v := range res.Items {
+		if yt.FindSongKeyword(*v) {
+			fmt.Println("TRUE:", v.Snippet.Title)
+		} else {
+			fmt.Println("FALSE:", v.Snippet.Title)
+		}
+	}
+
+}

@@ -2,6 +2,7 @@ package nsa
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 	"slices"
 	"time"
@@ -25,20 +26,54 @@ func NewJobs(youtubeApiKey string, db *bun.DB) *Job {
 }
 
 func (j *Job) CheckNewVideoJob() error {
-	// チャンネルIDリストを取得
+	// DBに登録されているプレイリストの動画数を取得
+	oldPlaylists, err := j.db.Playlists()
+	if err != nil {
+		return err
+	}
+
+	// プレイリストIDリスト
+	var plist []string
+	for pid := range oldPlaylists {
+		plist = append(plist, pid)
+	}
+
+	// Youtube Data API から最新のプレイリストの動画数を取得
+	newPlaylists, err := j.yt.Playlists(plist)
+	if err != nil {
+		return err
+	}
+
+	// 動画数が変化しているプレイリストIDを取得
+	var changedPlaylistID []string
+	for pid, itemCount := range oldPlaylists {
+		if itemCount != newPlaylists[pid] {
+			changedPlaylistID = append(changedPlaylistID, pid)
+		}
+	}
+
+	// 新しくアップロードされた動画IDを取得
+	vidList, err := j.yt.PlaylistItems(changedPlaylistID)
+	if err != nil {
+		return err
+	}
+
+	// RSSから動画IDリストを取得
 	cids, err := j.db.ChannelIDs()
 	if err != nil {
 		return err
 	}
-
-	// 過去5分間に投稿された動画を取得
-	vids, err := j.yt.RssFeed(cids)
+	rssVidList, err := j.yt.RssFeed(cids)
 	if err != nil {
 		return err
 	}
 
+	// 重複している動画IDを削除する準備
+	targetVids := append(vidList, rssVidList...)
+	slices.Sort(targetVids)
+
 	// 動画情報を取得
-	videos, err := j.yt.Videos(vids)
+	videos, err := j.yt.Videos(slices.Compact(targetVids))
 	if err != nil {
 		return err
 	}
@@ -49,35 +84,43 @@ func (j *Job) CheckNewVideoJob() error {
 		return err
 	}
 	for _, v := range notExistsVideos {
-		// 5分以内に公開される動画ではない場合
-		if !j.yt.IsStartWithin5m(v) {
+		// 生放送ではない、プレミア公開されない動画の場合
+		if v.LiveStreamingDetails == nil {
 			continue
 		}
-		// 歌ってみた動画に含まれているキーワードが含まれていない　除外キーワードが含まれている場合
+		// 放送終了した場合
+		if v.Snippet.LiveBroadcastContent == "none" {
+			continue
+		}
+		// 生放送の場合
+		if v.ContentDetails.Duration == "P0D" {
+			continue
+		}
 		if !j.yt.FindSongKeyword(v) || j.yt.FindIgnoreKeyword(v) {
 			continue
 		}
-
-		tokens, err := j.db.getSongTokens()
-		if err != nil {
-			return err
-		}
-		err = j.fcm.Notification(
-			"まもなく公開",
-			tokens,
-			&NotificationVideo{
-				ID:        v.Id,
-				Title:     v.Snippet.Title,
-				Thumbnail: v.Snippet.Thumbnails.High.Url,
-			},
-		)
-		if err != nil {
-			return err
+		// 5分以内に公開される動画
+		sst, _ := time.Parse("2006-01-02T15:04:05Z", v.LiveStreamingDetails.ScheduledStartTime)
+		sub := time.Now().UTC().Sub(sst).Minutes()
+		if sub < 5 && sub >= 0 {
+			tokens, err := j.db.getSongTokens()
+			if err != nil {
+				return err
+			}
+			j.fcm.Notification(
+				"まもなく公開",
+				tokens,
+				&NotificationVideo{
+					ID:        v.Id,
+					Title:     v.Snippet.Title,
+					Thumbnail: v.Snippet.Thumbnails.High.Url,
+				},
+			)
 		}
 	}
 
 	// 歌みた動画か判別しづらい動画をメールに送信する
-	for _, v := range videos {
+	for _, v := range notExistsVideos {
 		if j.yt.FindSongKeyword(v) {
 			continue
 		}
@@ -104,10 +147,32 @@ func (j *Job) CheckNewVideoJob() error {
 	// 3回までリトライ　1秒後にリトライ
 	err = retry.Do(
 		func() error {
+			// トランザクション開始
+			ctx := context.Background()
+			tx, err := j.db.Service.BeginTx(ctx, &sql.TxOptions{})
+			if err != nil {
+				return err
+			}
+
+			// DBのプレイリスト動画数を更新
+			err = j.db.UpdatePlaylistItem(tx, newPlaylists)
+			if err != nil {
+				tx.Rollback()
+				return err
+			}
+
 			// 動画情報をDBに登録
 			// 登録済みの動画は無視
-			err = j.db.SaveVideos(videos)
+			err = j.db.SaveVideos(tx, videos)
 			if err != nil {
+				tx.Rollback()
+				return err
+			}
+
+			// コミット
+			err = tx.Commit()
+			if err != nil {
+				tx.Rollback()
 				return err
 			}
 			return nil
@@ -147,7 +212,7 @@ func (j *Job) SongVideoAnnounceJob() error {
 	}
 
 	for _, v := range videos {
-		err := NewMail().Subject("歌みた動画判定").Id(v.ID).Title(v.Title).Send()
+		err := NewMail().Subject("5分後に公開").Id(v.ID).Title(v.Title).Send()
 		if err != nil {
 			return err
 		}
