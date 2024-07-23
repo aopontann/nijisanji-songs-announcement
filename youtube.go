@@ -307,7 +307,7 @@ func (y *Youtube) FindSongKeyword(video youtube.Video) bool {
 
 // 無視するキーワードが 指定した動画に含まれているか
 func (y *Youtube) FindIgnoreKeyword(video youtube.Video) bool {
-	for _, word := range []string{"切り抜き", "ラジオ"} {
+	for _, word := range []string{"切り抜き", "ラジオ", "くろなん"} {
 		if strings.Contains(strings.ToLower(video.Snippet.Title), strings.ToLower(word)) {
 			return true
 		}
