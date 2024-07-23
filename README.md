@@ -38,7 +38,7 @@ gcloud auth configure-docker asia-northeast1-docker.pkg.dev
 
 ### DBコンテナ
 ```
-podman run --name niji-tuu-postgres -e POSTGRES_PASSWORD=example -p 5432:5432 -d docker.io/library/postgres:16
+podman run --name niji-tuu-postgres -e POSTGRES_PASSWORD=example -p 5432:5432 -d docker.io/library/postgres:16.3
 podman start niji-tuu-postgres
 podman stop niji-tuu-postgres
 ```
