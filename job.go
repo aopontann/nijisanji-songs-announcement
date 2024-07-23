@@ -120,7 +120,7 @@ func (j *Job) CheckNewVideoJob() error {
 	}
 
 	// 歌みた動画か判別しづらい動画をメールに送信する
-	for _, v := range videos {
+	for _, v := range notExistsVideos {
 		if j.yt.FindSongKeyword(v) {
 			continue
 		}
@@ -212,7 +212,7 @@ func (j *Job) SongVideoAnnounceJob() error {
 	}
 
 	for _, v := range videos {
-		err := NewMail().Subject("歌みた動画判定").Id(v.ID).Title(v.Title).Send()
+		err := NewMail().Subject("5分後に公開").Id(v.ID).Title(v.Title).Send()
 		if err != nil {
 			return err
 		}
