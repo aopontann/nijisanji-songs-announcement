@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/xml"
 	"io"
+	"log"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -211,6 +213,65 @@ func (y *Youtube) RssFeed(clist []string) ([]string, error) {
 		}
 	}
 	return vids, nil
+}
+
+func (y *Youtube) UpcomingLiveVideoId(pids []string) ([]string, error) {
+	// 公開前、公開中の動画IDリスト
+	var resVID []string
+
+	vidPattern := `"videoId":".{11}"`
+	stylePattern := `"style":"(UPCOMING|LIVE|DEFAULT)"`
+	// 正規表現をコンパイル
+	vidReg, err := regexp.Compile(vidPattern)
+	if err != nil {
+		return nil, err
+	}
+	styleReg, err := regexp.Compile(stylePattern)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, pid := range pids {
+		resp, err := http.Get("https://www.youtube.com/playlist?list=" + pid)
+		if err != nil {
+			resp.Body.Close()
+			return nil, err
+		}
+		if resp.StatusCode != http.StatusOK {
+			slog.Warn("UpcomingLiveVideoId",
+				slog.String("severity", "WARNING"),
+				slog.String("playlist_id", pid),
+				slog.Int("status_code", resp.StatusCode),
+			)
+			resp.Body.Close()
+			return nil, err
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			resp.Body.Close()
+			return nil, err
+		}
+		resp.Body.Close()
+
+		text := string(body)
+
+		for _, t := range strings.Split(text, "playlistVideoRenderer")[1:] {
+			strVID := vidReg.FindString(t)
+			strStype := styleReg.FindString(t)
+			if strStype == "" {
+				log.Println("strVID:", strVID)
+				continue
+			}
+			vid := strings.Split(strVID, ":")[1]
+			style := strings.Split(strStype, ":")[1]
+
+			if style[1:len(style)-1] != "DEFAULT" {
+				resVID = append(resVID, vid[1:len(vid)-1])
+			}
+		}
+	}
+	return resVID, nil
 }
 
 // Youtube Data API から動画情報を取得

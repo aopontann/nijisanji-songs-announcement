@@ -58,6 +58,12 @@ func (j *Job) CheckNewVideoJob() error {
 		return err
 	}
 
+	//公開前、公開中の動画IDを取得
+	upcomingLiveVids, err := j.yt.UpcomingLiveVideoId(plist)
+	if err != nil {
+		return err
+	}
+
 	// RSSから動画IDリストを取得
 	cids, err := j.db.ChannelIDs()
 	if err != nil {
@@ -70,6 +76,7 @@ func (j *Job) CheckNewVideoJob() error {
 
 	// 重複している動画IDを削除する準備
 	targetVids := append(vidList, rssVidList...)
+	targetVids = append(targetVids, upcomingLiveVids...)
 	slices.Sort(targetVids)
 
 	// 動画情報を取得
