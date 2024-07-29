@@ -121,30 +121,6 @@ func TestRssFeed(t *testing.T) {
 	log.Println("vids:", vids)
 }
 
-func TestUpcomingLiveVideoIDs(t *testing.T) {
-	youtubeApiKey := os.Getenv("YOUTUBE_API_KEY")
-	yt := NewYoutube(youtubeApiKey)
-	bunDB := setup()
-	defer bunDB.Close()
-	db := NewDB(bunDB)
-
-	playlists, err := db.Playlists()
-	if err != nil {
-		t.Error(err)
-	}
-	var pids []string
-	for pid := range playlists {
-		pids = append(pids, pid)
-	}
-
-	vids, err := yt.UpcomingLiveVideoIDs(pids)
-	if err != nil {
-		t.Error(err)
-	}
-
-	log.Println("vids:", vids)
-}
-
 func TestVideos(t *testing.T) {
 	youtubeApiKey := os.Getenv("YOUTUBE_API_KEY")
 	yt := NewYoutube(youtubeApiKey)

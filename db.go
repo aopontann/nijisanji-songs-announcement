@@ -58,27 +58,6 @@ func NewDB(db *bun.DB) *DB {
 	return &DB{db}
 }
 
-// DBに登録されているPlaylistsの動画数を取得
-// 返り値：map （キー：プレイリストID　値：動画数）
-func (db *DB) Playlists() (map[string]int64, error) {
-	// DBからチャンネルID、チャンネルごとの動画数を取得
-	var ids []string
-	var itemCount []int64
-	ctx := context.Background()
-	err := db.Service.NewSelect().Model((*Vtuber)(nil)).Column("id", "item_count").Scan(ctx, &ids, &itemCount)
-	if err != nil {
-		return nil, err
-	}
-
-	list := make(map[string]int64, 500)
-	for i := range ids {
-		pid := strings.Replace(ids[i], "UC", "UU", 1)
-		list[pid] = itemCount[i]
-	}
-
-	return list, nil
-}
-
 func (db *DB) UpdatePlaylistItem(tx bun.Tx, newlist map[string]int64) error {
 	ctx := context.Background()
 	// DBを新しく取得したデータに更新
@@ -102,18 +81,6 @@ func (db *DB) UpdatePlaylistItem(tx bun.Tx, newlist map[string]int64) error {
 	}
 
 	return nil
-}
-
-func (db *DB) ChannelIDs() ([]string, error) {
-	// DBからチャンネルID、チャンネルごとの動画数を取得
-	var ids []string
-	ctx := context.Background()
-	err := db.Service.NewSelect().Model((*Vtuber)(nil)).Column("id").Scan(ctx, &ids)
-	if err != nil {
-		return nil, err
-	}
-
-	return ids, nil
 }
 
 func (db *DB) PlaylistIDs() ([]string, error) {

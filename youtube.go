@@ -100,68 +100,6 @@ func NewYoutube(key string) *Youtube {
 	return &Youtube{yt}
 }
 
-// チャンネルIDをキー、プレイリストに含まれている動画数を値とした連想配列を返す
-func (y *Youtube) Playlists(plist []string) (map[string]int64, error) {
-	newlist := make(map[string]int64, 500)
-	for i := 0; i*50 <= len(plist); i++ {
-		var id string
-		if len(plist) > 50*(i+1) {
-			id = strings.Join(plist[50*i:50*(i+1)], ",")
-		} else {
-			id = strings.Join(plist[50*i:], ",")
-		}
-		call := y.Service.Playlists.List([]string{"snippet", "contentDetails"}).MaxResults(50).Id(id)
-		res, err := call.Do()
-		if err != nil {
-			slog.Error("playlists-list",
-				slog.String("severity", "ERROR"),
-				slog.String("message", err.Error()),
-			)
-			return nil, err
-		}
-
-		for _, item := range res.Items {
-			newlist[item.Id] = item.ContentDetails.ItemCount
-			slog.Debug("youtube-playlists-list",
-				slog.String("severity", "DEBUG"),
-				slog.String("PlaylistId", item.Id),
-				slog.Int64("ItemCount", item.ContentDetails.ItemCount),
-			)
-		}
-	}
-	return newlist, nil
-}
-
-func (y *Youtube) PlaylistItems(plist []string) ([]string, error) {
-	// 動画IDを格納する文字列型配列を宣言
-	vids := make([]string, 0, 1500)
-
-	for _, pid := range plist {
-		var rid []string
-		call := y.Service.PlaylistItems.List([]string{"snippet"}).PlaylistId(pid).MaxResults(3)
-		res, err := call.Do()
-		if err != nil {
-			slog.Error("playlistitems-list",
-				slog.String("severity", "ERROR"),
-				slog.String("message", err.Error()),
-			)
-			return []string{}, err
-		}
-
-		for _, item := range res.Items {
-			rid = append(rid, item.Snippet.ResourceId.VideoId)
-			vids = append(vids, item.Snippet.ResourceId.VideoId)
-		}
-
-		slog.Debug("youtube-playlistitems-list",
-			slog.String("severity", "DEBUG"),
-			slog.String("PlaylistId", pid),
-			slog.String("videoId", strings.Join(rid, ",")),
-		)
-	}
-	return vids, nil
-}
-
 // RSSから過去30分間にアップロードされた動画IDを取得
 func (y *Youtube) RssFeed(pids []string) ([]string, error) {
 	var vids []string
@@ -212,6 +150,7 @@ func (y *Youtube) RssFeed(pids []string) ([]string, error) {
 	return vids, nil
 }
 
+// 公開前、公開中の動画IDを取得
 func (y *Youtube) UpcomingLiveVideoIDs(pids []string) ([]string, error) {
 	// 公開前、公開中の動画IDリスト
 	var resVIDs []string
@@ -307,32 +246,6 @@ func (y *Youtube) Videos(vids []string) ([]youtube.Video, error) {
 		}
 	}
 	return rlist, nil
-}
-
-// 放送前、放送中のプレミア動画、ライプ　普通動画の公開直後の動画に絞る
-func (y *Youtube) FilterVideos(videos []youtube.Video) []youtube.Video {
-	var filtedVideoList []youtube.Video
-	for _, v := range videos {
-		// プレミア公開、生放送終了した動画
-		if v.LiveStreamingDetails != nil && v.Snippet.LiveBroadcastContent == "none" {
-			continue
-		}
-
-		// プレミア公開、生放送をする予定、している最中の動画
-		if v.Snippet.LiveBroadcastContent != "none" {
-			filtedVideoList = append(filtedVideoList, v)
-			continue
-		}
-
-		// プレミア公開、生放送ではなく、10分以内に公開された動画
-		t, _ := time.Parse("2006-01-02T15:04:05Z", v.Snippet.PublishedAt)
-		if time.Now().UTC().Add(-10*time.Minute).Compare(t) < 0 {
-			filtedVideoList = append(filtedVideoList, v)
-			continue
-		}
-	}
-
-	return filtedVideoList
 }
 
 // 5分以内に公開される動画か
