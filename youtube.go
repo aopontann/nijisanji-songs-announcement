@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/xml"
 	"io"
-	"log"
 	"log/slog"
 	"net/http"
 	"regexp"
@@ -135,7 +134,7 @@ func (y *Youtube) Playlists(plist []string) (map[string]int64, error) {
 
 func (y *Youtube) PlaylistItems(plist []string) ([]string, error) {
 	// 動画IDを格納する文字列型配列を宣言
-	vidList := make([]string, 0, 1500)
+	vids := make([]string, 0, 1500)
 
 	for _, pid := range plist {
 		var rid []string
@@ -151,7 +150,7 @@ func (y *Youtube) PlaylistItems(plist []string) ([]string, error) {
 
 		for _, item := range res.Items {
 			rid = append(rid, item.Snippet.ResourceId.VideoId)
-			vidList = append(vidList, item.Snippet.ResourceId.VideoId)
+			vids = append(vids, item.Snippet.ResourceId.VideoId)
 		}
 
 		slog.Debug("youtube-playlistitems-list",
@@ -160,26 +159,17 @@ func (y *Youtube) PlaylistItems(plist []string) ([]string, error) {
 			slog.String("videoId", strings.Join(rid, ",")),
 		)
 	}
-	return vidList, nil
+	return vids, nil
 }
 
-// RSSから過去15分間にアップロードされた動画IDを取得
-func (y *Youtube) RssFeed(clist []string) ([]string, error) {
+// RSSから過去30分間にアップロードされた動画IDを取得
+func (y *Youtube) RssFeed(pids []string) ([]string, error) {
 	var vids []string
-	for _, cid := range clist {
-		resp, err := http.Get("https://www.youtube.com/feeds/videos.xml?channel_id=" + cid)
+	for _, pid := range pids {
+		resp, err := http.Get("https://www.youtube.com/feeds/videos.xml?playlist_id=" + pid)
 		if err != nil {
 			resp.Body.Close()
 			return nil, err
-		}
-		if resp.StatusCode != http.StatusOK {
-			slog.Warn("youtube-playlists-list",
-				slog.String("severity", "WARNING"),
-				slog.String("channel_id", cid),
-				slog.Int("status_code", resp.StatusCode),
-			)
-			resp.Body.Close()
-			continue
 		}
 
 		body, err := io.ReadAll(resp.Body)
@@ -189,18 +179,25 @@ func (y *Youtube) RssFeed(clist []string) ([]string, error) {
 		}
 		resp.Body.Close()
 
+		if resp.StatusCode != http.StatusOK {
+			slog.Warn("youtube-rss",
+				slog.String("severity", "WARNING"),
+				slog.String("playlist_id", pid),
+				slog.Int("status_code", resp.StatusCode),
+				slog.String("text", string(body)),
+			)
+			resp.Body.Close()
+			continue
+		}
+
 		var feed Feed
 		if err := xml.Unmarshal([]byte(body), &feed); err != nil {
-			slog.Error("playlists-list",
-				slog.String("severity", "ERROR"),
-				slog.String("message", err.Error()),
-			)
 			return nil, err
 		}
 
 		for _, entry := range feed.Entry {
 			sst, _ := time.Parse("2006-01-02T15:04:05+00:00", entry.Published)
-			if time.Now().UTC().Sub(sst).Minutes() <= 15 {
+			if time.Now().UTC().Sub(sst).Minutes() <= 30 {
 				slog.Debug("RssFeed",
 					slog.String("severity", "DEBUG"),
 					slog.String("id", entry.VideoId),
@@ -215,9 +212,9 @@ func (y *Youtube) RssFeed(clist []string) ([]string, error) {
 	return vids, nil
 }
 
-func (y *Youtube) UpcomingLiveVideoId(pids []string) ([]string, error) {
+func (y *Youtube) UpcomingLiveVideoIDs(pids []string) ([]string, error) {
 	// 公開前、公開中の動画IDリスト
-	var resVID []string
+	var resVIDs []string
 
 	vidPattern := `"videoId":".{11}"`
 	stylePattern := `"style":"(UPCOMING|LIVE|DEFAULT)"`
@@ -237,15 +234,6 @@ func (y *Youtube) UpcomingLiveVideoId(pids []string) ([]string, error) {
 			resp.Body.Close()
 			return nil, err
 		}
-		if resp.StatusCode != http.StatusOK {
-			slog.Warn("UpcomingLiveVideoId",
-				slog.String("severity", "WARNING"),
-				slog.String("playlist_id", pid),
-				slog.Int("status_code", resp.StatusCode),
-			)
-			resp.Body.Close()
-			return nil, err
-		}
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
@@ -253,44 +241,48 @@ func (y *Youtube) UpcomingLiveVideoId(pids []string) ([]string, error) {
 			return nil, err
 		}
 		resp.Body.Close()
-
 		text := string(body)
+
+		if resp.StatusCode != http.StatusOK {
+			slog.Warn("UpcomingLiveVideoId",
+				slog.String("severity", "WARNING"),
+				slog.String("playlist_id", pid),
+				slog.Int("status_code", resp.StatusCode),
+				slog.String("text", text),
+			)
+			continue
+		}
 
 		for _, t := range strings.Split(text, "playlistVideoRenderer")[1:] {
 			strVID := vidReg.FindString(t)
 			strStype := styleReg.FindString(t)
 			if strStype == "" {
-				log.Println("strVID:", strVID)
 				continue
 			}
 			vid := strings.Split(strVID, ":")[1]
 			style := strings.Split(strStype, ":")[1]
 
 			if style[1:len(style)-1] != "DEFAULT" {
-				resVID = append(resVID, vid[1:len(vid)-1])
+				resVIDs = append(resVIDs, vid[1:len(vid)-1])
 			}
 		}
 	}
-	return resVID, nil
+	return resVIDs, nil
 }
 
 // Youtube Data API から動画情報を取得
-func (y *Youtube) Videos(vidList []string) ([]youtube.Video, error) {
+func (y *Youtube) Videos(vids []string) ([]youtube.Video, error) {
 	var rlist []youtube.Video
-	for i := 0; i*50 <= len(vidList); i++ {
+	for i := 0; i*50 <= len(vids); i++ {
 		var id string
-		if len(vidList) > 50*(i+1) {
-			id = strings.Join(vidList[50*i:50*(i+1)], ",")
+		if len(vids) > 50*(i+1) {
+			id = strings.Join(vids[50*i:50*(i+1)], ",")
 		} else {
-			id = strings.Join(vidList[50*i:], ",")
+			id = strings.Join(vids[50*i:], ",")
 		}
 		call := y.Service.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(id).MaxResults(50)
 		res, err := call.Do()
 		if err != nil {
-			slog.Error("videos-list",
-				slog.String("severity", "ERROR"),
-				slog.String("message", err.Error()),
-			)
 			return nil, err
 		}
 
@@ -304,8 +296,8 @@ func (y *Youtube) Videos(vidList []string) ([]youtube.Video, error) {
 
 			rlist = append(rlist, *video)
 
-			slog.Info("youtube-video-list",
-				slog.String("severity", "INFO"),
+			slog.Debug("youtube-video-list",
+				slog.String("severity", "DEBUG"),
 				slog.String("id", video.Id),
 				slog.String("title", video.Snippet.Title),
 				slog.String("duration", video.ContentDetails.Duration),
@@ -318,9 +310,9 @@ func (y *Youtube) Videos(vidList []string) ([]youtube.Video, error) {
 }
 
 // 放送前、放送中のプレミア動画、ライプ　普通動画の公開直後の動画に絞る
-func (y *Youtube) FilterVideos(vlist []youtube.Video) []youtube.Video {
+func (y *Youtube) FilterVideos(videos []youtube.Video) []youtube.Video {
 	var filtedVideoList []youtube.Video
-	for _, v := range vlist {
+	for _, v := range videos {
 		// プレミア公開、生放送終了した動画
 		if v.LiveStreamingDetails != nil && v.Snippet.LiveBroadcastContent == "none" {
 			continue
@@ -344,13 +336,13 @@ func (y *Youtube) FilterVideos(vlist []youtube.Video) []youtube.Video {
 }
 
 // 5分以内に公開される動画か
-func (y *Youtube) IsStartWithin5m(v youtube.Video) bool {
+func (y *Youtube) IsStartWithin5m(video youtube.Video) bool {
 	// プレミア公開、生放送終了した動画
-	if v.LiveStreamingDetails == nil || v.Snippet.LiveBroadcastContent == "none" {
+	if video.LiveStreamingDetails == nil || video.Snippet.LiveBroadcastContent == "none" {
 		return false
 	}
 
-	sst, _ := time.Parse("2006-01-02T15:04:05Z", v.LiveStreamingDetails.ScheduledStartTime)
+	sst, _ := time.Parse("2006-01-02T15:04:05Z", video.LiveStreamingDetails.ScheduledStartTime)
 	sub := sst.Sub(time.Now().UTC()).Minutes()
 
 	return sub < 5 && sub >= 0

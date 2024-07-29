@@ -121,7 +121,7 @@ func TestRssFeed(t *testing.T) {
 	log.Println("vids:", vids)
 }
 
-func TestUpcomingLiveVideoId(t *testing.T) {
+func TestUpcomingLiveVideoIDs(t *testing.T) {
 	youtubeApiKey := os.Getenv("YOUTUBE_API_KEY")
 	yt := NewYoutube(youtubeApiKey)
 	bunDB := setup()
@@ -137,7 +137,7 @@ func TestUpcomingLiveVideoId(t *testing.T) {
 		pids = append(pids, pid)
 	}
 
-	vids, err := yt.UpcomingLiveVideoId(pids)
+	vids, err := yt.UpcomingLiveVideoIDs(pids)
 	if err != nil {
 		t.Error(err)
 	}
