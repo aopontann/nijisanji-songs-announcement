@@ -2,7 +2,6 @@ package nsa
 
 import (
 	"context"
-	"database/sql"
 	"log/slog"
 	"slices"
 	"time"
@@ -26,70 +25,60 @@ func NewJobs(youtubeApiKey string, db *bun.DB) *Job {
 }
 
 func (j *Job) CheckNewVideoJob() error {
-	// DBに登録されているプレイリストの動画数を取得
-	oldPlaylists, err := j.db.Playlists()
+	pids, err := j.db.PlaylistIDs()
 	if err != nil {
+		slog.Error("playlists-ids",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
 		return err
 	}
 
-	// プレイリストIDリスト
-	var plist []string
-	for pid := range oldPlaylists {
-		plist = append(plist, pid)
-	}
-
-	// Youtube Data API から最新のプレイリストの動画数を取得
-	newPlaylists, err := j.yt.Playlists(plist)
+	// 公開前、公開中の動画IDを取得
+	upcomingLiveVideoIDs, err := j.yt.UpcomingLiveVideoIDs(pids)
 	if err != nil {
+		slog.Error("upcoming-live-video-ids",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
 		return err
 	}
 
-	// 動画数が変化しているプレイリストIDを取得
-	var changedPlaylistID []string
-	for pid, itemCount := range oldPlaylists {
-		if itemCount != newPlaylists[pid] {
-			changedPlaylistID = append(changedPlaylistID, pid)
-		}
-	}
-
-	// 新しくアップロードされた動画IDを取得
-	vidList, err := j.yt.PlaylistItems(changedPlaylistID)
+	// RSSから過去30分間にアップロードされた動画IDを取得
+	rssVideoIDs, err := j.yt.RssFeed(pids)
 	if err != nil {
-		return err
-	}
-
-	//公開前、公開中の動画IDを取得
-	upcomingLiveVids, err := j.yt.UpcomingLiveVideoId(plist)
-	if err != nil {
-		return err
-	}
-
-	// RSSから動画IDリストを取得
-	cids, err := j.db.ChannelIDs()
-	if err != nil {
-		return err
-	}
-	rssVidList, err := j.yt.RssFeed(cids)
-	if err != nil {
+		slog.Error("rss-feed",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
 		return err
 	}
 
 	// 重複している動画IDを削除する準備
-	targetVids := append(vidList, rssVidList...)
-	targetVids = append(targetVids, upcomingLiveVids...)
-	slices.Sort(targetVids)
+	joinVIDs := append(upcomingLiveVideoIDs, rssVideoIDs...)
+	slices.Sort(joinVIDs)
 
 	// 動画情報を取得
-	videos, err := j.yt.Videos(slices.Compact(targetVids))
+	videos, err := j.yt.Videos(slices.Compact(joinVIDs))
 	if err != nil {
+		slog.Error("videos-list",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
+		return err
+	}
+
+	// DBに登録されていない動画情報のみにフィルター
+	notExistsVideos, err := j.db.NotExistsVideos(videos)
+	if err != nil {
+		slog.Error("not-exists-videos",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
 		return err
 	}
 
 	// 歌ってみた動画ゲリラ対応
-	notExistsVideos, err := j.db.NotExistsVideos(videos)
-	if err != nil {
-		return err
-	}
 	for _, v := range notExistsVideos {
 		// 生放送ではない、プレミア公開されない動画の場合
 		if v.LiveStreamingDetails == nil {
@@ -112,6 +101,10 @@ func (j *Job) CheckNewVideoJob() error {
 		if sub < 5 && sub >= 0 {
 			tokens, err := j.db.getSongTokens()
 			if err != nil {
+				slog.Error("get-song-tokens",
+					slog.String("severity", "ERROR"),
+					slog.String("message", err.Error()),
+				)
 				return err
 			}
 			j.fcm.Notification(
@@ -147,6 +140,10 @@ func (j *Job) CheckNewVideoJob() error {
 
 		err := NewMail().Subject("歌みた動画判定").Id(v.Id).Title(v.Snippet.Title).Send()
 		if err != nil {
+			slog.Error("mail-send",
+				slog.String("severity", "ERROR"),
+				slog.String("message", err.Error()),
+			)
 			return err
 		}
 	}
@@ -154,32 +151,10 @@ func (j *Job) CheckNewVideoJob() error {
 	// 3回までリトライ　1秒後にリトライ
 	err = retry.Do(
 		func() error {
-			// トランザクション開始
-			ctx := context.Background()
-			tx, err := j.db.Service.BeginTx(ctx, &sql.TxOptions{})
-			if err != nil {
-				return err
-			}
-
-			// DBのプレイリスト動画数を更新
-			err = j.db.UpdatePlaylistItem(tx, newPlaylists)
-			if err != nil {
-				tx.Rollback()
-				return err
-			}
-
 			// 動画情報をDBに登録
 			// 登録済みの動画は無視
-			err = j.db.SaveVideos(tx, videos)
+			err = j.db.SaveVideos(notExistsVideos)
 			if err != nil {
-				tx.Rollback()
-				return err
-			}
-
-			// コミット
-			err = tx.Commit()
-			if err != nil {
-				tx.Rollback()
 				return err
 			}
 			return nil
@@ -188,6 +163,10 @@ func (j *Job) CheckNewVideoJob() error {
 		retry.Delay(1*time.Second),
 	)
 	if err != nil {
+		slog.Error("save-videos-retry",
+			slog.String("severity", "ERROR"),
+			slog.String("message", err.Error()),
+		)
 		return err
 	}
 
@@ -198,7 +177,7 @@ func (j *Job) SongVideoAnnounceJob() error {
 	// 5分後にプレミア公開される歌みた動画を取得
 	videos, err := j.db.songVideos5m()
 	if err != nil {
-		slog.Error("songVideos5m",
+		slog.Error("song-videos-5m",
 			slog.String("severity", "ERROR"),
 			slog.String("message", err.Error()),
 		)
@@ -211,7 +190,7 @@ func (j *Job) SongVideoAnnounceJob() error {
 	// FCMトークンを取得
 	tokens, err := j.db.getSongTokens()
 	if err != nil {
-		slog.Error("fcmTokens",
+		slog.Error("get-song-tokens",
 			slog.String("severity", "ERROR"),
 			slog.String("message", err.Error()),
 		)
@@ -221,6 +200,10 @@ func (j *Job) SongVideoAnnounceJob() error {
 	for _, v := range videos {
 		err := NewMail().Subject("5分後に公開").Id(v.ID).Title(v.Title).Send()
 		if err != nil {
+			slog.Error("mail-send",
+				slog.String("severity", "ERROR"),
+				slog.String("message", err.Error()),
+			)
 			return err
 		}
 
@@ -234,6 +217,10 @@ func (j *Job) SongVideoAnnounceJob() error {
 				Thumbnail: v.Thumbnail,
 			})
 		if err != nil {
+			slog.Error("notification",
+				slog.String("severity", "ERROR"),
+				slog.String("message", err.Error()),
+			)
 			return err
 		}
 	}
