@@ -3,12 +3,15 @@ package nsa
 import (
 	"context"
 	"encoding/xml"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/avast/retry-go/v4"
 
 	"google.golang.org/api/option"
 	"google.golang.org/api/youtube/v3"
@@ -168,29 +171,43 @@ func (y *Youtube) UpcomingLiveVideoIDs(pids []string) ([]string, error) {
 	}
 
 	for _, pid := range pids {
-		resp, err := http.Get("https://www.youtube.com/playlist?list=" + pid)
-		if err != nil {
-			resp.Body.Close()
-			return nil, err
-		}
+		body, err := retry.DoWithData(
+			// 500が返ってきた場合もリトライ
+			func() ([]byte, error) {
+				resp, err := http.Get("https://www.youtube.com/playlist?list=" + pid)
+				if err != nil {
+					resp.Body.Close()
+					return nil, err
+				}
+				defer resp.Body.Close()
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					return nil, err
+				}
 
-		body, err := io.ReadAll(resp.Body)
+				if resp.StatusCode != http.StatusOK {
+					slog.Warn("UpcomingLiveVideoId",
+						slog.String("severity", "WARNING"),
+						slog.String("playlist_id", pid),
+						slog.Int("status_code", resp.StatusCode),
+						slog.String("text", string(body)),
+					)
+				}
+
+				// ステータスコード500が返ってきた場合
+				if resp.StatusCode == http.StatusInternalServerError {
+					return nil, errors.New("status_code:500")
+				}
+		
+				return body, nil
+			},
+			retry.Attempts(3),
+			retry.Delay(1*time.Second),
+		)
 		if err != nil {
-			resp.Body.Close()
 			return nil, err
 		}
-		resp.Body.Close()
 		text := string(body)
-
-		if resp.StatusCode != http.StatusOK {
-			slog.Warn("UpcomingLiveVideoId",
-				slog.String("severity", "WARNING"),
-				slog.String("playlist_id", pid),
-				slog.Int("status_code", resp.StatusCode),
-				slog.String("text", text),
-			)
-			continue
-		}
 
 		for _, t := range strings.Split(text, "playlistVideoRenderer")[1:] {
 			strVID := vidReg.FindString(t)
