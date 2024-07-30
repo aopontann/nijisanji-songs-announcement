@@ -5,7 +5,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/avast/retry-go"
+	"github.com/avast/retry-go/v4"
 	"github.com/uptrace/bun"
 )
 

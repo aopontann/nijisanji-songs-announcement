@@ -8,7 +8,7 @@ import (
 
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/messaging"
-	"github.com/avast/retry-go"
+	"github.com/avast/retry-go/v4"
 )
 
 type FCM struct {
