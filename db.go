@@ -130,7 +130,16 @@ func (db *DB) SaveVideos(videos []youtube.Video) error {
 	}
 
 	ctx := context.Background()
-	_, err := db.Service.NewInsert().Model(&Videos).Ignore().Exec(ctx)
+	_, err := db.Service.NewInsert().
+		Model(&Videos).
+		On("CONFLICT (id) DO UPDATE").
+		Set("title = EXCLUDED.title").
+		Set("duration = EXCLUDED.duration").
+		Set("viewers = EXCLUDED.viewers").
+		Set("content = EXCLUDED.content").
+		Set("scheduled_start_time = EXCLUDED.scheduled_start_time").
+		Set("updated_at = EXCLUDED.updated_at").
+		Exec(ctx)
 	if err != nil {
 		return err
 	}

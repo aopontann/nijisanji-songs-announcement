@@ -44,6 +44,47 @@ func TestSongVideos5m(t *testing.T) {
 	}
 }
 
+func TestSaveVideos(t *testing.T) {
+	youtubeApiKey := os.Getenv("YOUTUBE_API_KEY")
+	yt := NewYoutube(youtubeApiKey)
+
+	bunDB := setup()
+	defer bunDB.Close()
+	db := NewDB(bunDB)
+	ctx := context.Background()
+
+	videos := []Video{
+		{ID: "o4Xhm5fVMBA", Title: "aaa", Duration: "PT4M", Song: false, Viewers: 0, Content: "upcoming", StartTime: time.Date(2024, 6, 27, 12, 10, 0, 0, time.UTC)},
+		{ID: "jUdRrvEFZXc", Title: "bbb", Duration: "PT4M", Song: false, Viewers: 0, Content: "upcoming", StartTime: time.Date(2024, 6, 27, 12, 10, 0, 0, time.UTC)},
+		{ID: "pla0iR5CG4M", Title: "ccc", Duration: "PT4M", Song: false, Viewers: 0, Content: "upcoming", StartTime: time.Date(2024, 6, 27, 12, 10, 0, 0, time.UTC)},
+	}
+
+	_, err := bunDB.NewInsert().Model(&videos).Exec(ctx)
+	if err != nil {
+		t.Error(err)
+	}
+
+	newVideos, err := yt.Videos([]string{"o4Xhm5fVMBA", "jUdRrvEFZXc", "pla0iR5CG4M"})
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = db.SaveVideos(newVideos)
+	if err != nil {
+		t.Error(err)
+	}
+
+	var cids []string
+	var titles []string
+	err = db.Service.NewSelect().Model((*Video)(nil)).Column("id", "title").Scan(ctx, &cids, &titles)
+	if err != nil {
+		t.Error(err)
+	}
+
+	fmt.Println(cids)
+	fmt.Println(titles)
+}
+
 func TestNotExistsVideos(t *testing.T) {
 	bunDB := setup()
 	defer bunDB.Close()
