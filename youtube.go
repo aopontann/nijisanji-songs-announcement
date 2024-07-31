@@ -198,7 +198,7 @@ func (y *Youtube) UpcomingLiveVideoIDs(pids []string) ([]string, error) {
 				if resp.StatusCode == http.StatusInternalServerError {
 					return nil, errors.New("status_code:500")
 				}
-		
+
 				return body, nil
 			},
 			retry.Attempts(3),
@@ -296,4 +296,17 @@ func (y *Youtube) FindIgnoreKeyword(video youtube.Video) bool {
 		}
 	}
 	return false
+}
+
+// 消されていない動画か
+func (y *Youtube) IsExistsVideo(vid string) (bool, error) {
+	call := y.Service.Videos.List([]string{"snippet", "contentDetails", "liveStreamingDetails"}).Id(vid).MaxResults(1)
+	res, err := call.Do()
+	if err != nil {
+		return false, err
+	}
+	if len(res.Items) == 0 {
+		return false, nil
+	}
+	return true, nil
 }
