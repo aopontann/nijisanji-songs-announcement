@@ -151,8 +151,7 @@ func (j *Job) CheckNewVideoJob() error {
 	err = retry.Do(
 		func() error {
 			// 動画情報をDBに登録
-			// 登録済みの動画は無視
-			err = j.db.SaveVideos(notExistsVideos)
+			err = j.db.SaveVideos(videos)
 			if err != nil {
 				return err
 			}
@@ -197,7 +196,23 @@ func (j *Job) SongVideoAnnounceJob() error {
 	}
 
 	for _, v := range videos {
-		err := NewMail().Subject("5分後に公開").Id(v.ID).Title(v.Title).Send()
+		isExists, err := j.yt.IsExistsVideo(v.ID)
+		if err != nil {
+			slog.Error("is-exists-video",
+				slog.String("severity", "ERROR"),
+				slog.String("message", err.Error()),
+			)
+		}
+		if !isExists {
+			slog.Warn("is-exists-video",
+				slog.String("severity", "WARNING"),
+				slog.String("id", v.ID),
+				slog.String("message", "deleted video"),
+			)
+			continue
+		}
+
+		err = NewMail().Subject("5分後に公開").Id(v.ID).Title(v.Title).Send()
 		if err != nil {
 			slog.Error("mail-send",
 				slog.String("severity", "ERROR"),
