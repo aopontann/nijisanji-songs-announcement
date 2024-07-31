@@ -58,27 +58,6 @@ func NewDB(db *bun.DB) *DB {
 	return &DB{db}
 }
 
-// DBに登録されているPlaylistsの動画数を取得
-// 返り値：map （キー：プレイリストID　値：動画数）
-func (db *DB) Playlists() (map[string]int64, error) {
-	// DBからチャンネルID、チャンネルごとの動画数を取得
-	var ids []string
-	var itemCount []int64
-	ctx := context.Background()
-	err := db.Service.NewSelect().Model((*Vtuber)(nil)).Column("id", "item_count").Scan(ctx, &ids, &itemCount)
-	if err != nil {
-		return nil, err
-	}
-
-	list := make(map[string]int64, 500)
-	for i := range ids {
-		pid := strings.Replace(ids[i], "UC", "UU", 1)
-		list[pid] = itemCount[i]
-	}
-
-	return list, nil
-}
-
 func (db *DB) UpdatePlaylistItem(tx bun.Tx, newlist map[string]int64) error {
 	ctx := context.Background()
 	// DBを新しく取得したデータに更新
@@ -104,22 +83,26 @@ func (db *DB) UpdatePlaylistItem(tx bun.Tx, newlist map[string]int64) error {
 	return nil
 }
 
-func (db *DB) ChannelIDs() ([]string, error) {
-	// DBからチャンネルID、チャンネルごとの動画数を取得
-	var ids []string
+func (db *DB) PlaylistIDs() ([]string, error) {
+	var cids []string
 	ctx := context.Background()
-	err := db.Service.NewSelect().Model((*Vtuber)(nil)).Column("id").Scan(ctx, &ids)
+	err := db.Service.NewSelect().Model((*Vtuber)(nil)).Column("id").Scan(ctx, &cids)
 	if err != nil {
 		return nil, err
 	}
 
-	return ids, nil
+	var pids []string
+	for _, cid := range cids {
+		pids = append(pids, strings.Replace(cid, "UC", "UU", 1))
+	}
+
+	return pids, nil
 }
 
 // 動画情報をDBに登録　登録済みの動画は無視する
-func (db *DB) SaveVideos(tx bun.Tx, vlist []youtube.Video) error {
+func (db *DB) SaveVideos(videos []youtube.Video) error {
 	var Videos []Video
-	for _, v := range vlist {
+	for _, v := range videos {
 		var Viewers int64
 		Viewers = 0
 		scheduledStartTime := "1998-01-01 15:04:05" // 例 2022-03-28T11:00:00Z
@@ -147,7 +130,7 @@ func (db *DB) SaveVideos(tx bun.Tx, vlist []youtube.Video) error {
 	}
 
 	ctx := context.Background()
-	_, err := tx.NewInsert().Model(&Videos).Ignore().Exec(ctx)
+	_, err := db.Service.NewInsert().Model(&Videos).Ignore().Exec(ctx)
 	if err != nil {
 		return err
 	}
@@ -168,10 +151,6 @@ func (db *DB) NotExistsVideos(videos []youtube.Video) ([]youtube.Video, error) {
 	var ids []string
 	err := db.Service.NewSelect().Model((*Video)(nil)).Column("id").Where("id IN (?)", bun.In(sids)).Scan(ctx, &ids)
 	if err != nil {
-		slog.Error("NotExistsVideos",
-			slog.String("severity", "ERROR"),
-			slog.String("message", err.Error()),
-		)
 		return nil, err
 	}
 

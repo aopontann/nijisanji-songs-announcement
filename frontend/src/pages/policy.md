@@ -38,7 +38,7 @@ Googleフォームから問い合わせの際、問い合わせ内容が当ア�
 #### 当アプリのコンテンツ
 
 当アプリは、YouTube APIサービスによって動画情報の取得・通知をおこなっています。
-また、YouTube APIサービスの利用は、YouTubeの[利用規約](https://www.youtube.com/t/terms)及びGoogleの[プライバシーポリシー](https://policies.google.com/privacy)」に則り利用しております。  
+また、YouTube APIサービスの利用は、YouTubeの[利用規約](https://www.youtube.com/t/terms)及びGoogleの[プライバシーポリシー](https://policies.google.com/privacy)に則り利用しております。  
 ユーザーは当アプリを利用することでYouTubeの[利用規約](https://www.youtube.com/t/terms)及びGoogleの[プライバシーポリシー](https://policies.google.com/privacy)に同意したものとみなされます。
 
 #### プライバシーポリシーの変更

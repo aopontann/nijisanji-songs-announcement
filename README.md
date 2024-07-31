@@ -14,7 +14,7 @@
 ### マイグレーション
 ```
 atlas schema apply \
-  --url "postgres://postgres:example@/test_db?&sslmode=disable" \
+  --url "postgres://postgres:example@/postgres?&sslmode=disable" \
   --to "file://schema.sql" \
   --dev-url "docker://postgres/16"
 ```
