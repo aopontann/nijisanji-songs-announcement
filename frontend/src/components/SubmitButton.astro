@@ -2,13 +2,19 @@
 
 <script>
   import { toast } from "bulma-toast";
-  import { getMessaging, getToken } from "firebase/messaging";
+  import { getMessaging, getToken, isSupported } from "firebase/messaging";
   import { vapidKey } from "../scripts/main";
 
   const messaging = getMessaging();
   const submitEle = document.getElementById("submit") as HTMLElement;
 
+  const $iosModalEle = document.getElementById("ios-modal-js") as HTMLElement;
+
   submitEle.addEventListener("click", async () => {
+    if (!await isSupported()) {
+      $iosModalEle.classList.add("is-active");
+      return
+    }
     console.log("POST");
     // ローディング表示
     submitEle.classList.add("is-loading");
