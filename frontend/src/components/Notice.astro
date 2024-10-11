@@ -1,0 +1,19 @@
+<div class="form-control">
+    <label class="label cursor-pointer">
+        <span class="label-text">当アプリについてのお知らせを受け取る</span>
+        <input
+            id="toggle-info"
+            type="checkbox"
+            class="toggle"
+            checked="checked"
+        />
+    </label>
+</div>
+
+<script>
+    const infoEle = document.getElementById("toggle-info") as HTMLElement;
+
+    infoEle.addEventListener("click", async () => {
+        window.localStorage.setItem("toggle-info", infoEle.checked);
+    });
+</script>

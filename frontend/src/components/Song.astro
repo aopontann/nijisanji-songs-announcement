@@ -1,0 +1,14 @@
+<div class="form-control">
+  <label class="label cursor-pointer">
+    <span class="label-text">歌みた動画が公開される5分前に通知を受け取る</span>
+    <input id="toggle-song" type="checkbox" class="toggle" checked="checked" />
+  </label>
+</div>
+
+<script>
+  const songEle = document.getElementById("toggle-song") as HTMLElement;
+
+  songEle.addEventListener("click", async () => {
+    window.localStorage.setItem("toggle-song", songEle.checked)
+  });
+</script>
